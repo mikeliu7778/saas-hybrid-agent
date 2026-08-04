@@ -1,0 +1,34 @@
+{
+  "name": "@saas-hybrid-agent/client-agent",
+  "version": "1.0.0",
+  "main": "dist/index.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "build": "tsc -p tsconfig.json",
+    "test:watch": "vitest",
+    "lint": "tsc -p tsconfig.json --noEmit",
+    "demo": "npm run build && node dist/demo.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "type": "module",
+  "private": "true",
+  "devDependencies": {
+    "@types/node": "^22.20.1",
+    "@types/uuid": "^10.0.0",
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4"
+  },
+  "dependencies": {
+    "uuid": "^11.1.1"
+  },
+  "exports": "./dist/index.js",
+  "types": "dist/index.d.ts"
+}

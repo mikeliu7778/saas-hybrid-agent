@@ -1,0 +1,139 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://saas-hybrid-agent.local/schemas/sync-entities-phase-a.json",
+  "title": "SyncEntitiesPhaseA",
+  "description": "Phase A sync entity schemas shared by client and control plane",
+  "oneOf": [
+    { "$ref": "#/$defs/message" },
+    { "$ref": "#/$defs/semantic" },
+    { "$ref": "#/$defs/episode" },
+    { "$ref": "#/$defs/session_meta" },
+    { "$ref": "#/$defs/tombstone" }
+  ],
+  "$defs": {
+    "message": {
+      "type": "object",
+      "required": ["entityType", "entityId", "version", "updatedAt", "deviceId", "payload"],
+      "properties": {
+        "entityType": { "const": "message" },
+        "entityId": { "type": "string", "minLength": 1 },
+        "version": { "type": "integer", "minimum": 1 },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "deviceId": { "type": "string", "minLength": 1 },
+        "tombstone": { "type": "boolean" },
+        "payload": {
+          "type": "object",
+          "required": ["sessionId", "role", "content"],
+          "properties": {
+            "sessionId": { "type": "string" },
+            "role": { "type": "string", "enum": ["user", "assistant", "system", "tool"] },
+            "content": { "type": "string" }
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "semantic": {
+      "type": "object",
+      "required": ["entityType", "entityId", "version", "updatedAt", "deviceId", "payload"],
+      "properties": {
+        "entityType": { "const": "semantic" },
+        "entityId": { "type": "string", "minLength": 1 },
+        "version": { "type": "integer", "minimum": 1 },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "deviceId": { "type": "string", "minLength": 1 },
+        "tombstone": { "type": "boolean" },
+        "embedding": {
+          "type": "array",
+          "items": { "type": "number" }
+        },
+        "embeddingModelId": { "type": "string" },
+        "payload": {
+          "type": "object",
+          "required": ["text"],
+          "properties": {
+            "text": { "type": "string" },
+            "tags": {
+              "type": "array",
+              "items": { "type": "string" }
+            }
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "episode": {
+      "type": "object",
+      "required": ["entityType", "entityId", "version", "updatedAt", "deviceId", "payload"],
+      "properties": {
+        "entityType": { "const": "episode" },
+        "entityId": { "type": "string", "minLength": 1 },
+        "version": { "type": "integer", "minimum": 1 },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "deviceId": { "type": "string", "minLength": 1 },
+        "tombstone": { "type": "boolean" },
+        "embedding": {
+          "type": "array",
+          "items": { "type": "number" }
+        },
+        "embeddingModelId": { "type": "string" },
+        "payload": {
+          "type": "object",
+          "required": ["summary"],
+          "properties": {
+            "summary": { "type": "string" },
+            "timeRangeStart": { "type": "string", "format": "date-time" },
+            "timeRangeEnd": { "type": "string", "format": "date-time" },
+            "messageRefs": {
+              "type": "array",
+              "items": { "type": "string" }
+            }
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "session_meta": {
+      "type": "object",
+      "required": ["entityType", "entityId", "version", "updatedAt", "deviceId", "payload"],
+      "properties": {
+        "entityType": { "const": "session_meta" },
+        "entityId": { "type": "string", "minLength": 1 },
+        "version": { "type": "integer", "minimum": 1 },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "deviceId": { "type": "string", "minLength": 1 },
+        "tombstone": { "type": "boolean" },
+        "payload": {
+          "type": "object",
+          "required": ["title"],
+          "properties": {
+            "title": { "type": "string" },
+            "maxIterations": { "type": "integer" }
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "tombstone": {
+      "type": "object",
+      "required": ["entityType", "entityId", "version", "updatedAt", "deviceId", "tombstone", "payload"],
+      "properties": {
+        "entityType": {
+          "type": "string",
+          "enum": ["message", "semantic", "episode", "procedural", "session_meta"]
+        },
+        "entityId": { "type": "string", "minLength": 1 },
+        "version": { "type": "integer", "minimum": 1 },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "deviceId": { "type": "string", "minLength": 1 },
+        "tombstone": { "const": true },
+        "payload": { "type": "object" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

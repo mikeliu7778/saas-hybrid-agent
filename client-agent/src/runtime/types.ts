@@ -1,0 +1,140 @@
+/** Public ClientAgentRuntime contract — design §5.1 / PRD US-P03 */
+
+export type TurnStatus = "completed" | "cancelled" | "failed" | "budget_exhausted";
+
+export interface SessionConfig {
+  maxIterations?: number;
+  systemPrompt?: string;
+  toolNames?: string[];
+}
+
+export interface TurnResult {
+  sessionId: string;
+  turnId: string;
+  status: TurnStatus;
+  assistantText: string;
+  iterations: number;
+  errorMessage?: string;
+}
+
+export interface StreamDelta {
+  type: "text" | "tool_call" | "tool_result" | "status" | "error" | "done";
+  text?: string;
+  toolName?: string;
+  toolCallId?: string;
+  status?: TurnStatus;
+  errorMessage?: string;
+}
+
+export type StreamHandler = (delta: StreamDelta) => void;
+
+export interface ClientAgentRuntime {
+  createSession(config?: SessionConfig): Promise<string>;
+  runTurn(
+    sessionId: string,
+    userMessage: string,
+    stream?: StreamHandler,
+  ): Promise<TurnResult>;
+  interrupt(sessionId: string): Promise<void>;
+  importMemoryPack(data: Uint8Array): Promise<void>;
+  exportMemoryPack(): Promise<Uint8Array>;
+  pushSync(): Promise<void>;
+  pullSync(): Promise<void>;
+  startBackgroundSync(): void;
+}
+
+export interface LlmMessage {
+  role: "system" | "user" | "assistant" | "tool";
+  content: string | null;
+  tool_calls?: LlmToolCall[];
+  tool_call_id?: string;
+  name?: string;
+}
+
+export interface LlmToolCall {
+  id: string;
+  type: "function";
+  function: { name: string; arguments: string };
+}
+
+export interface LlmToolDefinition {
+  type: "function";
+  function: {
+    name: string;
+    description?: string;
+    parameters?: Record<string, unknown>;
+  };
+}
+
+export interface LlmResult {
+  content: string | null;
+  tool_calls: LlmToolCall[];
+  finish_reason?: string;
+  /** Monotonic SSE/JSON event cursor from the control plane. */
+  cursor?: string;
+}
+
+export interface LlmCallOptions {
+  signal?: AbortSignal;
+  /** Resume / Last-Event-ID style cursor from a prior SSE event. */
+  cursor?: string;
+}
+
+export interface LlmTransport {
+  complete(
+    messages: LlmMessage[],
+    tools: LlmToolDefinition[],
+    options?: LlmCallOptions,
+  ): Promise<LlmResult>;
+  stream(
+    messages: LlmMessage[],
+    tools: LlmToolDefinition[],
+    onDelta: (text: string) => void,
+    options?: LlmCallOptions,
+  ): Promise<LlmResult>;
+}
+
+export interface MemoryBundle {
+  semantic: Array<{ id: string; text: string; score: number }>;
+  episode: Array<{ id: string; summary: string; score: number }>;
+  procedural: Array<{ id: string; text: string; score: number }>;
+  workspaceHints: string[];
+}
+
+export interface MemoryOrchestrator {
+  retrieve(query: string): Promise<MemoryBundle>;
+  commitTurn(turnTrace: {
+    sessionId: string;
+    turnId: string;
+    userMessage: string;
+    assistantText: string;
+  }): Promise<void>;
+}
+
+export interface SyncMutation {
+  entityType: "message" | "semantic" | "episode" | "procedural" | "session_meta";
+  entityId: string;
+  version: number;
+  updatedAt: string;
+  deviceId: string;
+  tombstone?: boolean;
+  payload: Record<string, unknown>;
+  embedding?: number[];
+  embeddingModelId?: string;
+}
+
+export interface SyncPushRequest {
+  deviceId: string;
+  mutations: SyncMutation[];
+}
+
+export interface SyncPullResponse {
+  cursor: string;
+  mutations: SyncMutation[];
+}
+
+export interface SyncEngine {
+  push(): Promise<void>;
+  pull(): Promise<void>;
+  startBackgroundSync(): void;
+}

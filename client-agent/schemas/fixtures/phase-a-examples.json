@@ -1,0 +1,93 @@
+{
+  "semantic": {
+    "entityType": "semantic",
+    "entityId": "sem-1",
+    "version": 1,
+    "updatedAt": "2026-07-27T02:00:00.000Z",
+    "deviceId": "dev-web-1",
+    "embedding": [0.1, 0.2, 0.3],
+    "embeddingModelId": "text-embedding-3-small",
+    "payload": {
+      "text": "User prefers Simplified Chinese",
+      "tags": ["preference", "locale"]
+    }
+  },
+  "episode": {
+    "entityType": "episode",
+    "entityId": "epi-1",
+    "version": 1,
+    "updatedAt": "2026-07-27T02:05:00.000Z",
+    "deviceId": "dev-web-1",
+    "embedding": [0.4, 0.1, 0.0],
+    "embeddingModelId": "text-embedding-3-small",
+    "payload": {
+      "summary": "Helped revise resume last week",
+      "timeRangeStart": "2026-07-20T00:00:00.000Z",
+      "timeRangeEnd": "2026-07-20T01:00:00.000Z",
+      "messageRefs": ["msg-10", "msg-11"]
+    }
+  },
+  "message": {
+    "entityType": "message",
+    "entityId": "msg-1",
+    "version": 1,
+    "updatedAt": "2026-07-27T02:10:00.000Z",
+    "deviceId": "dev-web-1",
+    "payload": {
+      "sessionId": "sess-1",
+      "role": "user",
+      "content": "Hello"
+    }
+  },
+  "session_meta": {
+    "entityType": "session_meta",
+    "entityId": "sess-1",
+    "version": 1,
+    "updatedAt": "2026-07-27T02:00:00.000Z",
+    "deviceId": "dev-web-1",
+    "payload": {
+      "title": "General",
+      "maxIterations": 90
+    }
+  },
+  "tombstone": {
+    "entityType": "semantic",
+    "entityId": "sem-old",
+    "version": 3,
+    "updatedAt": "2026-07-27T03:00:00.000Z",
+    "deviceId": "dev-web-1",
+    "tombstone": true,
+    "payload": {}
+  },
+  "sse_delta": {
+    "type": "delta",
+    "text": "Hello"
+  },
+  "sse_done": {
+    "type": "done",
+    "finish_reason": "stop"
+  },
+  "llm_chat_request": {
+    "model": "gpt-4o-mini",
+    "stream": true,
+    "messages": [
+      { "role": "user", "content": "hi" }
+    ],
+    "tools": [
+      {
+        "type": "function",
+        "function": {
+          "name": "read_file",
+          "description": "Read a sandbox file",
+          "parameters": { "type": "object" }
+        }
+      }
+    ]
+  },
+  "embedding_response": {
+    "model": "text-embedding-3-small",
+    "data": [
+      { "index": 0, "embedding": [0.01, 0.02, 0.03] }
+    ]
+  }
+}

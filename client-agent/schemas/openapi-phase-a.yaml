@@ -1,0 +1,314 @@
+openapi: 3.0.3
+info:
+  title: Client Agent Control Plane API
+  version: 0.1.0-phase-a
+  description: |
+    Phase A thin control plane: Auth/Devices, LLM gateway, embeddings, sync, quota.
+    Sync payloads are NOT E2E encrypted in Phase A (OD-1); migrate in Phase B.
+servers:
+  - url: /
+paths:
+  /v1/devices:
+    post:
+      operationId: registerDevice
+      summary: Register a device and obtain a bearer token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeviceRegisterRequest"
+      responses:
+        "201":
+          description: Device registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeviceRegisterResponse"
+  /v1/devices/{id}:
+    delete:
+      operationId: revokeDevice
+      summary: Revoke a device token
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      security:
+        - bearerAuth: []
+      responses:
+        "204":
+          description: Revoked
+        "401":
+          description: Unauthorized
+  /v1/llm/chat:
+    post:
+      operationId: llmChat
+      summary: Proxy OpenAI-compatible chat completions (SSE)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LlmChatRequest"
+      responses:
+        "200":
+          description: SSE stream of chat events
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        "401":
+          description: Unauthorized
+        "429":
+          description: Rate limited
+  /v1/llm/embeddings:
+    post:
+      operationId: llmEmbeddings
+      summary: Proxy embeddings
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EmbeddingRequest"
+      responses:
+        "200":
+          description: Embedding vectors
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmbeddingResponse"
+  /v1/sync/push:
+    post:
+      operationId: syncPush
+      summary: Upload mutation set (Phase A plaintext OK)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SyncPushRequest"
+      responses:
+        "200":
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [accepted]
+                properties:
+                  accepted:
+                    type: integer
+  /v1/sync/pull:
+    get:
+      operationId: syncPull
+      summary: Pull mutations since cursor
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: since
+          in: query
+          required: false
+          schema:
+            type: string
+            default: "0"
+      responses:
+        "200":
+          description: Mutations
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SyncPullResponse"
+  /v1/quota:
+    get:
+      operationId: getQuota
+      summary: Current usage and limits
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Quota
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuotaResponse"
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    DeviceRegisterRequest:
+      type: object
+      required: [name, platform]
+      properties:
+        name:
+          type: string
+        platform:
+          type: string
+          enum: [web, ios, android]
+    DeviceRegisterResponse:
+      type: object
+      required: [deviceId, token, userId]
+      properties:
+        deviceId:
+          type: string
+        token:
+          type: string
+        userId:
+          type: string
+    LlmChatRequest:
+      type: object
+      required: [messages]
+      properties:
+        model:
+          type: string
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChatMessage"
+        tools:
+          type: array
+          items:
+            type: object
+          description: Tool schemas uploaded by client for this request
+        stream:
+          type: boolean
+          default: true
+        cursor:
+          type: string
+          description: Optional resume cursor / Last-Event-ID from a prior SSE event
+    ChatMessage:
+      type: object
+      required: [role]
+      properties:
+        role:
+          type: string
+          enum: [system, user, assistant, tool]
+        content:
+          type: string
+          nullable: true
+        tool_calls:
+          type: array
+          items:
+            type: object
+        tool_call_id:
+          type: string
+        name:
+          type: string
+    EmbeddingRequest:
+      type: object
+      required: [input]
+      properties:
+        model:
+          type: string
+        input:
+          oneOf:
+            - type: string
+            - type: array
+              items:
+                type: string
+    EmbeddingResponse:
+      type: object
+      required: [model, data]
+      properties:
+        model:
+          type: string
+        data:
+          type: array
+          items:
+            type: object
+            required: [embedding, index]
+            properties:
+              embedding:
+                type: array
+                items:
+                  type: number
+              index:
+                type: integer
+    SyncMutation:
+      type: object
+      required: [entityType, entityId, version, updatedAt, deviceId, payload]
+      properties:
+        entityType:
+          type: string
+          enum: [message, semantic, episode, procedural, session_meta]
+        entityId:
+          type: string
+        version:
+          type: integer
+          minimum: 1
+        updatedAt:
+          type: string
+          format: date-time
+        deviceId:
+          type: string
+        tombstone:
+          type: boolean
+        payload:
+          type: object
+          additionalProperties: true
+        embedding:
+          type: array
+          items:
+            type: number
+        embeddingModelId:
+          type: string
+    SyncPushRequest:
+      type: object
+      required: [deviceId, mutations]
+      properties:
+        deviceId:
+          type: string
+        mutations:
+          type: array
+          items:
+            $ref: "#/components/schemas/SyncMutation"
+    SyncPullResponse:
+      type: object
+      required: [cursor, mutations]
+      properties:
+        cursor:
+          type: string
+        mutations:
+          type: array
+          items:
+            $ref: "#/components/schemas/SyncMutation"
+    QuotaResponse:
+      type: object
+      required: [llmTokensUsed, llmTokensLimit, embeddingCallsUsed, embeddingCallsLimit]
+      properties:
+        llmTokensUsed:
+          type: integer
+        llmTokensLimit:
+          type: integer
+        embeddingCallsUsed:
+          type: integer
+        embeddingCallsLimit:
+          type: integer
+    SseChatEvent:
+      type: object
+      description: Logical SSE payload shapes for /v1/llm/chat
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum: [delta, tool_call, error, done]
+        text:
+          type: string
+        error:
+          type: string
+        finish_reason:
+          type: string
+        cursor:
+          type: string
+          description: Monotonic event cursor (also sent as SSE id)
