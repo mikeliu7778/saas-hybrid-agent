@@ -69,7 +69,9 @@ public class BearerTokenFilter extends OncePerRequestFilter {
   }
 
   private static boolean requiresDeviceAuth(String method, String uri) {
-    if (uri.startsWith("/v1/llm/") || uri.startsWith("/v1/sync/")) {
+    if (uri.startsWith("/v1/llm/")
+        || uri.startsWith("/v1/sync/")
+        || uri.startsWith("/v1/trust/")) {
       return true;
     }
     if ("/v1/quota".equals(uri)) {
