@@ -10,7 +10,8 @@
     "build": "tsc -p tsconfig.json",
     "test:watch": "vitest",
     "lint": "tsc -p tsconfig.json --noEmit",
-    "demo": "npm run build && node dist/demo.js"
+    "demo": "npm run build && node dist/demo.js",
+    "demo:web": "npm run build && npx --yes serve -p 5173 ."
   },
   "keywords": [],
   "author": "",

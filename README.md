@@ -26,6 +26,20 @@ cd client-agent && npm test
 
 API 默认监听 `http://localhost:8080`。
 
+## Trust Demo Web UI
+
+```bash
+# terminal 1 — control plane
+./mvnw -pl server spring-boot:run
+
+# terminal 2 — static demo (serves client-agent so /web/ can import ../dist)
+cd client-agent && npm run demo:web
+```
+
+浏览器打开 `http://localhost:5173/web/`：注册设备 → 发消息 → 👍/👎 → Memory 删除；勾选「上报采信」后可查 `GET /v1/trust/metrics`。
+
+手动验收：发「我喜欢简体中文」→ Memory 出现 preference → 👎 或删除 Memory → 列表更新。
+
 ## Environment variables
 
 | Variable | Description |

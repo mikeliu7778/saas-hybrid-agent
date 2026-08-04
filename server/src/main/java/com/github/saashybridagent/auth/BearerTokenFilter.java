@@ -40,6 +40,12 @@ public class BearerTokenFilter extends OncePerRequestFilter {
     String uri = request.getRequestURI();
     String method = request.getMethod();
 
+    // CORS preflight must pass without Bearer auth
+    if (HttpMethod.OPTIONS.matches(method)) {
+      filterChain.doFilter(request, response);
+      return;
+    }
+
     if (HEALTH_PATH.equals(uri)
         || (HttpMethod.POST.matches(method) && DEVICES_PATH.equals(uri))) {
       filterChain.doFilter(request, response);
