@@ -4,6 +4,7 @@ import {
   type SemanticRow,
   type EmbedFn,
 } from "../memory/InMemoryMemoryStore.js";
+import type { TrustEvent } from "../trust/types.js";
 import type { KvStore } from "./types.js";
 
 /**
@@ -62,5 +63,10 @@ export class PersistedMemoryStore extends InMemoryMemoryStore {
   override upsertEpisode(row: EpisodeRow): void {
     super.upsertEpisode(row);
     void this.flush();
+  }
+
+  override async applyTrust(event: TrustEvent): Promise<void> {
+    await super.applyTrust(event);
+    await this.flush();
   }
 }

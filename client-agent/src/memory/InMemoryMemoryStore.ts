@@ -1,4 +1,6 @@
 import type { MemoryBundle, MemoryOrchestrator } from "../runtime/types.js";
+import { applyTrustToSemantic } from "../trust/applyTrust.js";
+import type { TrustEvent } from "../trust/types.js";
 
 export interface SemanticRow {
   id: string;
@@ -82,8 +84,12 @@ export class InMemoryMemoryStore implements MemoryOrchestrator {
     const { embedding } = await this.embed(query);
 
     const sem = [...this.semantic.values()]
-      .filter((r) => !r.tombstone)
-      .map((r) => ({ id: r.id, text: r.text, score: cosine(embedding, r.embedding) }))
+      .filter((r) => !r.tombstone && !r.deprecated)
+      .map((r) => ({
+        id: r.id,
+        text: r.text,
+        score: cosine(embedding, r.embedding) * (0.5 + 0.5 * (r.trustScore ?? 0.5)),
+      }))
       .sort((a, b) => b.score - a.score)
       .slice(0, Date.now() - started > this.retrieveBudgetMs ? 2 : 8);
 
@@ -159,5 +165,12 @@ export class InMemoryMemoryStore implements MemoryOrchestrator {
 
   upsertEpisode(row: EpisodeRow): void {
     this.episode.set(row.id, row);
+  }
+
+  async applyTrust(event: TrustEvent): Promise<void> {
+    if (event.target !== "memory_item") return;
+    const row = this.semantic.get(event.targetId);
+    if (!row) return;
+    this.semantic.set(event.targetId, applyTrustToSemantic(row, event));
   }
 }

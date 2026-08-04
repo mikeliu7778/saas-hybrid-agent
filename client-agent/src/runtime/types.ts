@@ -1,5 +1,7 @@
 /** Public ClientAgentRuntime contract — design §5.1 / PRD US-P03 */
 
+import type { TrustEvent } from "../trust/types.js";
+
 export type TurnStatus = "completed" | "cancelled" | "failed" | "budget_exhausted";
 
 export interface SessionConfig {
@@ -109,6 +111,7 @@ export interface MemoryOrchestrator {
     userMessage: string;
     assistantText: string;
   }): Promise<void>;
+  applyTrust?(event: TrustEvent): Promise<void>;
 }
 
 export interface SyncMutation {
