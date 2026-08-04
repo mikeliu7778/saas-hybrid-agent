@@ -2,12 +2,13 @@ import { describe, it, expect, vi } from "vitest";
 import { hashEmbed, InMemoryMemoryStore } from "../src/memory/InMemoryMemoryStore.js";
 import { MockLlmTransport } from "../src/llm/MockLlmTransport.js";
 import { DefaultClientAgentRuntime } from "../src/runtime/DefaultClientAgentRuntime.js";
+import type { MemoryOrchestrator } from "../src/runtime/types.js";
 import { ToolHost } from "../src/tools/ToolHost.js";
 import { TrustEventQueue } from "../src/trust/TrustEventQueue.js";
 import type { TrustEvent } from "../src/trust/types.js";
 
 function makeRuntime(
-  mem: InMemoryMemoryStore,
+  mem: MemoryOrchestrator,
   extras?: {
     trustQueue?: TrustEventQueue;
     trustClient?: { append: (events: TrustEvent[]) => Promise<void> };
@@ -68,6 +69,34 @@ describe("Runtime trust feedback APIs", () => {
     });
 
     expect(mem.semantic.get("sem-1")!.trustScore).toBeGreaterThan(0.5);
+  });
+
+  it("runTurn awaits commitTurn before returning TurnResult", async () => {
+    const baseMem = new InMemoryMemoryStore({ deviceId: "d1" });
+    let commitFinished = false;
+    const mem: MemoryOrchestrator = {
+      retrieve: (query) => baseMem.retrieve(query),
+      commitTurn: async (trace) => {
+        await new Promise((r) => setTimeout(r, 50));
+        await baseMem.commitTurn(trace);
+        commitFinished = true;
+      },
+      applyTrust: (event) => baseMem.applyTrust!(event),
+      listSemantic: () => baseMem.listSemantic!(),
+      deleteSemantic: (id) => baseMem.deleteSemantic!(id),
+    };
+
+    const runtime = makeRuntime(mem);
+    const sessionId = await runtime.createSession();
+    const started = Date.now();
+    const result = await runtime.runTurn(sessionId, "我喜欢简体中文");
+    const elapsed = Date.now() - started;
+
+    expect(result.status).toBe("completed");
+    expect(commitFinished).toBe(true);
+    expect(elapsed).toBeGreaterThanOrEqual(45);
+    const listed = await runtime.listMemory();
+    expect(listed.some((m) => m.text.includes("简体中文"))).toBe(true);
   });
 
   it("runTurn applies implicit reuse and fire-and-forget flush", async () => {

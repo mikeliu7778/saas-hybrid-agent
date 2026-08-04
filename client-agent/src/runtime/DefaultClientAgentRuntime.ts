@@ -116,7 +116,7 @@ export class DefaultClientAgentRuntime implements ClientAgentRuntime {
     await this.persist(session);
 
     if (this.opts.memory && result.status === "completed") {
-      void this.opts.memory.commitTurn({
+      await this.opts.memory.commitTurn({
         sessionId,
         turnId: result.turnId,
         userMessage,
