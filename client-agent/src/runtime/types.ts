@@ -1,6 +1,6 @@
 /** Public ClientAgentRuntime contract — design §5.1 / PRD US-P03 */
 
-import type { TrustEvent } from "../trust/types.js";
+import type { TrustEvent, TrustSignal, TrustTarget } from "../trust/types.js";
 
 export type TurnStatus = "completed" | "cancelled" | "failed" | "budget_exhausted";
 
@@ -30,6 +30,21 @@ export interface StreamDelta {
 
 export type StreamHandler = (delta: StreamDelta) => void;
 
+export interface MemoryListItem {
+  id: string;
+  text: string;
+  trustScore?: number;
+  deprecated?: boolean;
+}
+
+export interface SubmitFeedbackInput {
+  sessionId: string;
+  turnId?: string;
+  target: TrustTarget;
+  targetId: string;
+  signal: TrustSignal;
+}
+
 export interface ClientAgentRuntime {
   createSession(config?: SessionConfig): Promise<string>;
   runTurn(
@@ -43,6 +58,10 @@ export interface ClientAgentRuntime {
   pushSync(): Promise<void>;
   pullSync(): Promise<void>;
   startBackgroundSync(): void;
+  submitFeedback(input: SubmitFeedbackInput): Promise<void>;
+  listMemory(): Promise<MemoryListItem[]>;
+  deleteMemory(id: string): Promise<void>;
+  setTrustReportingEnabled(enabled: boolean): void;
 }
 
 export interface LlmMessage {
@@ -112,6 +131,8 @@ export interface MemoryOrchestrator {
     assistantText: string;
   }): Promise<void>;
   applyTrust?(event: TrustEvent): Promise<void>;
+  listSemantic?(): Promise<MemoryListItem[]>;
+  deleteSemantic?(id: string): Promise<void>;
 }
 
 export interface SyncMutation {

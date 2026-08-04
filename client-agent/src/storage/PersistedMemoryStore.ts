@@ -69,4 +69,9 @@ export class PersistedMemoryStore extends InMemoryMemoryStore {
     await super.applyTrust(event);
     await this.flush();
   }
+
+  override async deleteSemantic(id: string): Promise<void> {
+    await super.deleteSemantic(id);
+    await this.flush();
+  }
 }

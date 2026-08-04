@@ -3,13 +3,20 @@ import type {
   MemoryOrchestrator,
   SessionConfig,
   StreamHandler,
+  SubmitFeedbackInput,
   SyncEngine,
   TurnResult,
+  MemoryListItem,
 } from "./types.js";
 import { ConversationLoop, type SessionState } from "./ConversationLoop.js";
 import type { LlmTransport } from "./types.js";
 import type { ToolHost } from "../tools/ToolHost.js";
 import type { PersistedSessionStore } from "../storage/PersistedSessionStore.js";
+import { TrustSignalCollector } from "../trust/TrustSignalCollector.js";
+import {
+  TrustEventQueue,
+  type TrustEventClient,
+} from "../trust/TrustEventQueue.js";
 
 export interface DefaultRuntimeOptions {
   llm: LlmTransport;
@@ -19,16 +26,28 @@ export interface DefaultRuntimeOptions {
   sessionStore?: PersistedSessionStore;
   defaultMaxIterations?: number;
   defaultSystemPrompt?: string;
+  deviceId?: string;
+  trustCollector?: TrustSignalCollector;
+  trustQueue?: TrustEventQueue;
+  trustClient?: TrustEventClient;
 }
 
 export class DefaultClientAgentRuntime implements ClientAgentRuntime {
   private readonly sessions = new Map<string, SessionState>();
   private readonly loop: ConversationLoop;
   private readonly opts: DefaultRuntimeOptions;
+  private readonly trustCollector: TrustSignalCollector;
+  private readonly trustQueue: TrustEventQueue;
+  private readonly trustClient?: TrustEventClient;
 
   constructor(opts: DefaultRuntimeOptions) {
     this.opts = opts;
     this.loop = new ConversationLoop({ llm: opts.llm, tools: opts.tools });
+    const deviceId = opts.deviceId ?? "local";
+    this.trustCollector =
+      opts.trustCollector ?? new TrustSignalCollector({ deviceId });
+    this.trustQueue = opts.trustQueue ?? new TrustEventQueue();
+    this.trustClient = opts.trustClient;
   }
 
   async createSession(config?: SessionConfig): Promise<string> {
@@ -78,8 +97,10 @@ export class DefaultClientAgentRuntime implements ClientAgentRuntime {
     const baseSystem = session.systemPrompt.split("\n\nRelevant memory:\n")[0];
     session.systemPrompt = baseSystem;
 
+    let recalledIds: string[] = [];
     if (this.opts.memory) {
       const bundle = await this.opts.memory.retrieve(userMessage);
+      recalledIds = bundle.semantic.map((s) => s.id);
       const memBits = [
         ...bundle.semantic.map((s) => `- fact: ${s.text}`),
         ...bundle.episode.map((e) => `- past: ${e.summary}`),
@@ -101,10 +122,24 @@ export class DefaultClientAgentRuntime implements ClientAgentRuntime {
         userMessage,
         assistantText: result.assistantText,
       });
+
+      const events = this.trustCollector.onTurnCompleted({
+        sessionId,
+        turnId: result.turnId,
+        userMessage,
+        recalledMemoryIds: recalledIds,
+        assistantText: result.assistantText,
+      });
+      for (const event of events) {
+        await this.opts.memory.applyTrust?.(event);
+        this.trustQueue.enqueue(event);
+      }
+      this.fireFlush();
     }
 
     return result;
   }
+
   async interrupt(sessionId: string): Promise<void> {
     this.requireSession(sessionId).interrupt.abort();
   }
@@ -129,8 +164,45 @@ export class DefaultClientAgentRuntime implements ClientAgentRuntime {
     this.opts.sync?.startBackgroundSync();
   }
 
+  async submitFeedback(input: SubmitFeedbackInput): Promise<void> {
+    const event = this.trustCollector.onExplicitFeedback({
+      sessionId: input.sessionId,
+      turnId: input.turnId,
+      target: input.target,
+      targetId: input.targetId,
+      signal: input.signal,
+    });
+    if (input.target === "memory_item") {
+      await this.opts.memory?.applyTrust?.(event);
+    }
+    this.trustQueue.enqueue(event);
+    this.fireFlush();
+  }
+
+  async listMemory(): Promise<MemoryListItem[]> {
+    if (!this.opts.memory?.listSemantic) return [];
+    return this.opts.memory.listSemantic();
+  }
+
+  async deleteMemory(id: string): Promise<void> {
+    await this.opts.memory?.deleteSemantic?.(id);
+    const event = this.trustCollector.onMemoryDeleted(id);
+    await this.opts.memory?.applyTrust?.(event);
+    this.trustQueue.enqueue(event);
+    this.fireFlush();
+  }
+
+  setTrustReportingEnabled(enabled: boolean): void {
+    this.trustQueue.setReportingEnabled(enabled);
+  }
+
   getSessionMessages(sessionId: string) {
     return [...this.requireSession(sessionId).messages];
+  }
+
+  private fireFlush(): void {
+    if (!this.trustClient) return;
+    void this.trustQueue.flush(this.trustClient);
   }
 
   private async persist(session: SessionState): Promise<void> {

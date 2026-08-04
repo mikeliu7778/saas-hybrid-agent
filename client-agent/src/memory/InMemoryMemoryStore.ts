@@ -1,4 +1,8 @@
-import type { MemoryBundle, MemoryOrchestrator } from "../runtime/types.js";
+import type {
+  MemoryBundle,
+  MemoryListItem,
+  MemoryOrchestrator,
+} from "../runtime/types.js";
 import { applyTrustToSemantic } from "../trust/applyTrust.js";
 import type { TrustEvent } from "../trust/types.js";
 
@@ -165,6 +169,30 @@ export class InMemoryMemoryStore implements MemoryOrchestrator {
 
   upsertEpisode(row: EpisodeRow): void {
     this.episode.set(row.id, row);
+  }
+
+  /** List non-tombstone semantic rows (includes deprecated for UI). */
+  async listSemantic(): Promise<MemoryListItem[]> {
+    return [...this.semantic.values()]
+      .filter((r) => !r.tombstone)
+      .map((r) => ({
+        id: r.id,
+        text: r.text,
+        trustScore: r.trustScore,
+        deprecated: r.deprecated,
+      }));
+  }
+
+  /** Mark a semantic row deprecated (soft-delete / tombstone path). */
+  async deleteSemantic(id: string): Promise<void> {
+    const row = this.semantic.get(id);
+    if (!row || row.tombstone) return;
+    this.semantic.set(id, {
+      ...row,
+      deprecated: true,
+      version: row.version + 1,
+      updatedAt: new Date().toISOString(),
+    });
   }
 
   async applyTrust(event: TrustEvent): Promise<void> {

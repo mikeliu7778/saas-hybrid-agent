@@ -1,7 +1,9 @@
 import type {
   ClientAgentRuntime,
+  MemoryListItem,
   SessionConfig,
   StreamHandler,
+  SubmitFeedbackInput,
   TurnResult,
 } from "./types.js";
 
@@ -50,6 +52,22 @@ export class StubClientAgentRuntime implements ClientAgentRuntime {
   }
 
   startBackgroundSync(): void {
+    /* no-op */
+  }
+
+  async submitFeedback(_input: SubmitFeedbackInput): Promise<void> {
+    /* no-op */
+  }
+
+  async listMemory(): Promise<MemoryListItem[]> {
+    return [];
+  }
+
+  async deleteMemory(_id: string): Promise<void> {
+    /* no-op */
+  }
+
+  setTrustReportingEnabled(_enabled: boolean): void {
     /* no-op */
   }
 }
