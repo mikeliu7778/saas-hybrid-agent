@@ -9,6 +9,12 @@ export interface SemanticRow {
   deviceId: string;
   version: number;
   tombstone?: boolean;
+  trustScore?: number;
+  confidence?: number;
+  lastTrustedAt?: string;
+  sourceTurnId?: string;
+  deprecated?: boolean;
+  supersededBy?: string;
 }
 
 export interface EpisodeRow {
