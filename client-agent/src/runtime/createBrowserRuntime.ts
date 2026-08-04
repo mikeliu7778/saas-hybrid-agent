@@ -11,6 +11,9 @@ import { OpfsKvStore } from "../storage/OpfsKvStore.js";
 import { PersistedSessionStore } from "../storage/PersistedSessionStore.js";
 import { PersistedMemoryStore } from "../storage/PersistedMemoryStore.js";
 import { getBrowserOpfsRoot, type OpfsDirectoryHandle } from "../storage/memoryOpfsRoot.js";
+import { HttpTrustEventClient } from "../trust/HttpTrustEventClient.js";
+import { TrustEventQueue } from "../trust/TrustEventQueue.js";
+import { TrustSignalCollector } from "../trust/TrustSignalCollector.js";
 
 export interface CreateBrowserRuntimeOptions {
   baseUrl: string;
@@ -57,11 +60,22 @@ export async function createBrowserRuntime(opts: CreateBrowserRuntimeOptions) {
     model: opts.model,
   });
   const sessionStore = new PersistedSessionStore(kv);
+  const deviceId = opts.deviceId ?? "web";
+  const trustCollector = new TrustSignalCollector({ deviceId });
+  const trustQueue = new TrustEventQueue();
+  const trustClient = new HttpTrustEventClient({
+    baseUrl: opts.baseUrl,
+    token: opts.token,
+  });
   const runtime = new DefaultClientAgentRuntime({
     llm,
     tools,
     memory,
     sessionStore,
+    deviceId,
+    trustCollector,
+    trustQueue,
+    trustClient,
   });
   await runtime.hydrateSessions();
   return { runtime, memory, workspace, kv };

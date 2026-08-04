@@ -33,3 +33,18 @@ export {
   createMemoryOpfsRoot,
   getBrowserOpfsRoot,
 } from "./storage/memoryOpfsRoot.js";
+export { HttpTrustEventClient } from "./trust/HttpTrustEventClient.js";
+export type { HttpTrustEventClientOptions } from "./trust/HttpTrustEventClient.js";
+export { TrustEventQueue } from "./trust/TrustEventQueue.js";
+export type { TrustEventClient } from "./trust/TrustEventQueue.js";
+export { TrustSignalCollector } from "./trust/TrustSignalCollector.js";
+export type {
+  TrustSignalCollectorOptions,
+  TurnCompletedInput,
+  ExplicitFeedbackInput,
+} from "./trust/TrustSignalCollector.js";
+export type {
+  TrustEvent,
+  TrustSignal,
+  TrustTarget,
+} from "./trust/types.js";
