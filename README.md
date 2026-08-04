@@ -59,6 +59,8 @@ cd client-agent && npm run demo:web
 | `POST /v1/sync/push` | bearer | Mutation upload (Phase A **plaintext**, not E2E) |
 | `GET /v1/sync/pull?since=cursor` | bearer | Monotonic cursor pull |
 | `GET /v1/quota` | bearer | Usage vs limits |
+| `POST /v1/trust/events` | bearer | Batch append trust signals; idempotent on `eventId` → `{ accepted, duplicates }` |
+| `GET /v1/trust/metrics?from=&to=&grain=day` | bearer | Per-day counts by signal and `kind` |
 | `GET /v1/health` | none | Health check |
 
 ```yaml
@@ -82,6 +84,7 @@ OpenAPI: `client-agent/schemas/openapi-phase-a.yaml`
 
 - PRD: `docs/superpowers/specs/2026-07-27-client-agent-runtime-prd.md`
 - Design: `docs/superpowers/specs/2026-08-03-saas-hybrid-agent-design.md`
+- Trust flywheel: `docs/superpowers/specs/2026-08-04-trust-signal-data-flywheel-design.md`
 
 ## Non-goals（后置）
 

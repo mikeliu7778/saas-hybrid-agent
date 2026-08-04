@@ -1,7 +1,7 @@
 # 采信信号与个人数据飞轮设计
 
 - 日期：2026-08-04
-- 状态：已确认（待实现计划）
+- 状态：已实现（待验收）
 - 关联：
   - [2026-08-03-saas-hybrid-agent-design.md](./2026-08-03-saas-hybrid-agent-design.md)
   - [2026-07-27-client-agent-runtime-prd.md](./2026-07-27-client-agent-runtime-prd.md)
@@ -29,7 +29,7 @@
 
 - 仍**不做中心向量库 / 跨用户语义检索**（与 PRD 非目标一致）。
 - 「服务端有用户数据」指 **Sync 可读副本**，不是中心 ANN。
-- PRD Phase B「默认 E2E 加密同步」改为：**E2E 为后置可选**；一期默认平台可读。实现前需同步修订 PRD 对应表述。
+- PRD Phase B「默认 E2E 加密同步」已修订为：**E2E 为后置可选**；一期默认平台可读（见 PRD §1 / US-C03 / OD-1）。
 
 ## 2. 目标与边界
 

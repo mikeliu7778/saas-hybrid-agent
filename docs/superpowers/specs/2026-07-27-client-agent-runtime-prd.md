@@ -3,6 +3,7 @@
 - 日期：2026-07-27
 - 状态：草案（待评审）
 - 关联 design：[2026-08-03-saas-hybrid-agent-design.md](./2026-08-03-saas-hybrid-agent-design.md)
+- 关联 trust：[2026-08-04-trust-signal-data-flywheel-design.md](./2026-08-04-trust-signal-data-flywheel-design.md)
 - 产品定位：一人一设备本地 Agent Runtime + 共享 LLM / 同步云控制面
 
 ## 1. 背景与问题
@@ -14,6 +15,8 @@
 3. **多端连续**：同一账号在手机 / 平板 / Web 间需要状态连续，但不需要中心在线共享完整向量索引。
 
 **产品结论：** 不做「一人一 Pod」；采用 **客户端跑循环 + Memory + 工具，服务端做薄控制面（鉴权、LLM 代理、同步、配额）**。
+
+**Sync 与采信飞轮：** 一期 Sync 在服务端保存**平台可读** messages / Memory 副本，支撑多端一致；采信信号经 `POST /v1/trust/events` 上行、控制面聚合 `GET /v1/trust/metrics`，端上 `applyTrust` 消费信号改进本地 Memory。E2E 加密同步为后置可选，详见 [trust design](./2026-08-04-trust-signal-data-flywheel-design.md)。
 
 ## 2. 产品目标
 
@@ -28,7 +31,7 @@
 | SC-1 | 用户可在 Web 完成「对话 → 本地 Memory 召回 → 工具调用 → 流式回复」闭环 | Phase A 演示 / E2E |
 | SC-2 | Memory 检索不请求中心向量库；单用户本地索引可支撑 ≤1e5 条量级 | 架构评审 + 本地压测 |
 | SC-3 | 同账号两设备间 messages + Memory 行数据可异步同步并冲突可收敛 | 双端同步用例 |
-| SC-4 | LLM API Key 不出端；默认 Memory/workspace 备份为端到端加密（Phase B 起强制） | 安全评审 |
+| SC-4 | LLM API Key 不出端；Sync 默认平台可读；E2E 加密为后置可选（见 trust design） | 安全评审 |
 | SC-5 | 不支持的工具能力向模型返回明确 unsupported，不导致 Runtime 崩溃 | 工具矩阵用例 |
 
 ### 2.3 非目标（一期明确不做）
@@ -54,7 +57,7 @@
 | 阶段 | 名称 | 范围摘要 | 优先级 |
 |------|------|----------|--------|
 | Phase A | 验证闭环（Web 优先） | TS Runtime + LlmGateway；Semantic + Episode 本地检索；messages + memory 同步（可先非 E2E）；沙箱文件 + HTTP 工具 | P0 |
-| Phase B | 移动端与加固 | iOS/Android 同协议 Runtime；端侧 embedding；E2E 加密同步；Procedural Memory | P0（接 A） |
+| Phase B | 移动端与加固 | iOS/Android 同协议 Runtime；端侧 embedding；采信飞轮与 trust metrics；Procedural Memory；E2E 加密同步为可选后置 | P0（接 A） |
 | Phase C | 增强 | Workspace 大文件分块；可选 Dev Companion 远程终端；端侧小模型抽取/重排 | P1 |
 
 本 PRD 的 User Story 按阶段标注；**验收以 Phase A 为第一交付门槛**，B/C 作为后续里程碑。
@@ -207,13 +210,13 @@
   2. Phase B 移动端：优先端侧小 embedding 模型；同步携带 `embedding_model_id`。
   3. 模型版本变更后可触发懒重嵌，旧向量不导致崩溃。
 
-#### US-C03 端到端加密备份
+#### US-C03 端到端加密备份（可选后置）
 
-- **Story：** 作为隐私敏感用户，我希望云端默认看不到我的 Memory 与 workspace 明文，以便放心开启同步。
-- **优先级：** P0｜**阶段：** B（默认强制）；A 可先明文同步以便验证闭环
+- **Story：** 作为隐私敏感用户，我希望可选地让云端看不到我的 Memory 与 workspace 明文，以便在需要时加强隐私。
+- **优先级：** P1｜**阶段：** 后置可选（A/B 默认平台可读 Sync，见 [trust design](./2026-08-04-trust-signal-data-flywheel-design.md)）
 - **验收标准：**
-  1. Memory/workspace 上传前使用用户密钥派生的信封加密；服务端仅存密文。
-  2. 「明文云记忆 / 服务端智能推荐」若存在，必须单独显式开关，默认关闭。
+  1. 开启 E2E 时：Memory/workspace 上传前使用用户密钥派生的信封加密；服务端仅存密文。
+  2. 默认 Sync 为平台可读副本，支撑多端与采信飞轮；「明文云记忆 / 服务端智能推荐」若存在，必须单独显式开关。
 
 #### US-C04 用量与配额可见
 
@@ -293,7 +296,7 @@
 | ID | 类别 | 要求 |
 |----|------|------|
 | NFR-1 | 规模 | 单用户本地 Memory 合计按 <1e5 条设计；检索超时可降级 FTS |
-| NFR-2 | 隐私 | LLM 密钥仅存 Gateway；Phase B 起默认同步 E2E 加密 |
+| NFR-2 | 隐私 | LLM 密钥仅存 Gateway；Sync 默认平台可读；E2E 加密为后置可选 |
 | NFR-3 | 性能 | Turn 开始前 Memory 检索有时间预算；超时降级不得卡死 UI |
 | NFR-4 | 可靠 | 同步支持 cursor 增量、tombstone；冲突策略文档化并可测 |
 | NFR-5 | 安全 | ToolHost 域名白名单；禁止把密钥写入 Memory；提示词注入缓解 |
@@ -314,8 +317,9 @@
 ### Phase B（移动 + 加固）
 
 - [ ] US-P02；US-M04；US-M05
-- [ ] US-C02 端侧 embedding；US-C03 E2E 加密默认开启
+- [ ] US-C02 端侧 embedding；采信飞轮 + `POST /v1/trust/events` / `GET /v1/trust/metrics`（见 [trust design](./2026-08-04-trust-signal-data-flywheel-design.md)）
 - [ ] US-S04 完整吊销体验
+- [ ] US-C03 E2E 加密（可选后置，非 B 门槛）
 
 ### Phase C（增强）
 
@@ -347,7 +351,7 @@
 
 | 编号 | 问题 | 建议默认 |
 |------|------|----------|
-| OD-1 | Phase A 同步是否允许暂时非 E2E？ | 允许，但 B 必须默认 E2E；A 文档标注风险 |
+| OD-1 | Phase A 同步是否允许暂时非 E2E？ | 允许；A/B 默认平台可读 Sync；E2E 为后置可选（见 trust design） |
 | OD-2 | Web Embedding 一期用云还是尽早端侧？ | A 用云；B 移动端侧，Web 可随后跟上 |
 | OD-3 | 共享核心用 KMP / Rust 还是三端各自实现？ | A 先 TS 规格 + 契约测试；B 再定共享核心 |
 | OD-4 | 现有服务端 `run_terminal` 多租户路径？ | 降级/移除出默认 C 端路径；保留私有化文档 |
@@ -357,3 +361,4 @@
 | 日期 | 说明 |
 |------|------|
 | 2026-07-27 | 初稿：由客户端 Runtime 设计转化为 PRD；含角色、分期、User Stories 与验收标准 |
+| 2026-08-04 | 对齐 trust design：Sync 默认平台可读；E2E 改为可选后置；链到采信飞轮设计 |

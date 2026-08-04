@@ -3,8 +3,8 @@ info:
   title: Client Agent Control Plane API
   version: 0.1.0-phase-a
   description: |
-    Phase A thin control plane: Auth/Devices, LLM gateway, embeddings, sync, quota.
-    Sync payloads are NOT E2E encrypted in Phase A (OD-1); migrate in Phase B.
+    Phase A thin control plane: Auth/Devices, LLM gateway, embeddings, sync, quota, trust signals.
+    Sync payloads are NOT E2E encrypted in Phase A (OD-1); E2E sync is optional/postponed (see trust design).
 servers:
   - url: /
 paths:
@@ -140,6 +140,66 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/QuotaResponse"
+  /v1/trust/events:
+    post:
+      operationId: appendTrustEvents
+      summary: Append trust signal events (idempotent on eventId)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TrustEventsRequest"
+      responses:
+        "200":
+          description: Batch processed; whole batch rejected with 400 if any event is invalid
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrustEventsResponse"
+        "400":
+          description: Invalid batch (missing required fields or invalid signal)
+        "401":
+          description: Unauthorized
+  /v1/trust/metrics:
+    get:
+      operationId: getTrustMetrics
+      summary: Aggregate trust event counts by day
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: from
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: grain
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [day]
+            default: day
+      responses:
+        "200":
+          description: Aggregated buckets (empty array when no events)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrustMetricsResponse"
+        "400":
+          description: Unsupported grain (only day supported)
+        "401":
+          description: Unauthorized
 components:
   securitySchemes:
     bearerAuth:
@@ -312,3 +372,82 @@ components:
         cursor:
           type: string
           description: Monotonic event cursor (also sent as SSE id)
+    TrustEventDto:
+      type: object
+      required: [eventId, kind, target, targetId, signal, ts]
+      properties:
+        eventId:
+          type: string
+          description: Client-generated idempotency key
+        deviceId:
+          type: string
+        accountId:
+          type: string
+        sessionId:
+          type: string
+        turnId:
+          type: string
+        kind:
+          type: string
+          description: e.g. explicit_message_feedback, implicit_followup
+        target:
+          type: string
+          description: assistant_message, memory_item, tool_result, citation
+        targetId:
+          type: string
+        signal:
+          type: string
+          enum: [trust, distrust, correct]
+        strength:
+          type: number
+          minimum: 0
+          maximum: 1
+          default: 0.5
+        payload:
+          type: object
+          additionalProperties: true
+        ts:
+          type: string
+          format: date-time
+    TrustEventsRequest:
+      type: object
+      required: [events]
+      properties:
+        events:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/TrustEventDto"
+    TrustEventsResponse:
+      type: object
+      required: [accepted, duplicates]
+      properties:
+        accepted:
+          type: integer
+        duplicates:
+          type: integer
+    TrustMetricsResponse:
+      type: object
+      required: [buckets]
+      properties:
+        buckets:
+          type: array
+          items:
+            $ref: "#/components/schemas/TrustMetricsBucket"
+    TrustMetricsBucket:
+      type: object
+      required: [key, trust, distrust, correct, byKind]
+      properties:
+        key:
+          type: string
+          description: Date bucket key (YYYY-MM-DD when grain=day)
+        trust:
+          type: integer
+        distrust:
+          type: integer
+        correct:
+          type: integer
+        byKind:
+          type: object
+          additionalProperties:
+            type: integer
