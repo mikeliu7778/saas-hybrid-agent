@@ -13,6 +13,7 @@ describe("CA-2.1 / CA-2.2 OpenAPI & sync schemas exist", () => {
     const yaml = readFileSync(join(schemasDir, "openapi-phase-a.yaml"), "utf8");
     for (const path of [
       "/v1/llm/chat",
+      "/v1/llm/capabilities",
       "/v1/llm/embeddings",
       "/v1/sync/push",
       "/v1/sync/pull",
@@ -22,6 +23,7 @@ describe("CA-2.1 / CA-2.2 OpenAPI & sync schemas exist", () => {
       expect(yaml).toContain(path);
     }
     expect(yaml).toContain("SseChatEvent");
+    expect(yaml).toContain("ContentPart");
     expect(yaml).toContain("text/event-stream");
   });
 

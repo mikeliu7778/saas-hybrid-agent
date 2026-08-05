@@ -63,6 +63,22 @@ paths:
                 type: string
         "401":
           description: Unauthorized
+        "400":
+          description: |
+            Multimodal validation (e.g. model lacks vision, image limit, unsupported MIME, image on non-user role).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                model_lacks_vision:
+                  value:
+                    code: model_lacks_vision
+                    message: "model does not support vision: gpt-3.5-turbo"
+                image_limit:
+                  value:
+                    code: image_limit
+                    message: "at most 5 images are allowed per request"
         "429":
           description: Rate limited
   /v1/llm/embeddings:
@@ -84,6 +100,38 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/EmbeddingResponse"
+  /v1/llm/capabilities:
+    get:
+      operationId: llmCapabilities
+      summary: Vision and other model capabilities for the effective model
+      description: |
+        Uses request `model` when provided, otherwise server default (`saas-hybrid-agent.llm.model`).
+        `provider` is echoed in the response for client convenience; vision is determined by static model table only.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: model
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Model name to query (defaults to configured chat model)
+        - name: provider
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [openai, cursor]
+          description: Optional provider hint (returned as-is; does not change vision lookup)
+      responses:
+        "200":
+          description: Capabilities for the effective model
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LlmCapabilitiesResponse"
+        "401":
+          description: Unauthorized
   /v1/sync/push:
     post:
       operationId: syncPush
@@ -254,6 +302,24 @@ components:
         cursor:
           type: string
           description: Optional resume cursor / Last-Event-ID from a prior SSE event
+    ContentPart:
+      type: object
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum: [text, image_url]
+        text:
+          type: string
+        image_url:
+          type: object
+          properties:
+            url:
+              type: string
+              description: data:image/...;base64,... or https://...
+            detail:
+              type: string
+              enum: [auto, low, high]
     ChatMessage:
       type: object
       required: [role]
@@ -262,8 +328,15 @@ components:
           type: string
           enum: [system, user, assistant, tool]
         content:
-          type: string
-          nullable: true
+          oneOf:
+            - type: string
+              nullable: true
+            - type: array
+              items:
+                $ref: "#/components/schemas/ContentPart"
+          description: |
+            Plain string (legacy) or OpenAI-style content parts. Only `role=user` may include `image_url` parts
+            (max 5 images, 4MB each, MIME png/jpeg/gif/webp).
         tool_calls:
           type: array
           items:
@@ -272,6 +345,31 @@ components:
           type: string
         name:
           type: string
+    LlmCapabilitiesResponse:
+      type: object
+      required: [vision, model]
+      properties:
+        vision:
+          type: boolean
+          description: Whether the effective model supports image inputs
+        model:
+          type: string
+          description: Model name used for the lookup
+        provider:
+          type: string
+          description: Echo of request provider query param (may be empty)
+    ErrorResponse:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+          additionalProperties: true
+          nullable: true
     EmbeddingRequest:
       type: object
       required: [input]

@@ -69,13 +69,16 @@ cd client-agent && npm run demo:web
 
 `POST /v1/llm/chat` 请求体可选 `provider` 覆盖默认值。`provider=cursor` 时 Java 转发至本机 sidecar；**忽略**请求中的 `tools`，响应 **不含** LLM `tool_calls`——端上 Hybrid 工具环需 `provider=openai`。
 
+**Multimodal（vision）：** 用户消息可传 OpenAI 风格 content parts（`text` + `image_url` data URI）。无 vision 的模型（如 `gpt-3.5-turbo`）会在端上禁用选图，且服务端返回 `400`（`model_lacks_vision`）。默认 `gpt-4o-mini` 支持 vision；发图前可调用 `GET /v1/llm/capabilities` 查询。
+
 ## Phase A control plane
 
 | Path | Auth | Notes |
 |------|------|-------|
 | `POST /v1/devices` | none | Register device → `{ deviceId, token, userId }` |
 | `DELETE /v1/devices/{id}` | bearer | Revoke device token |
-| `POST /v1/llm/chat` | bearer | SSE (default) or JSON (`stream: false`) |
+| `POST /v1/llm/chat` | bearer | SSE (default) or JSON (`stream: false`); `content` may be string or `[{ type, text?, image_url? }]` parts (user role only for images) |
+| `GET /v1/llm/capabilities?model=&provider=` | bearer | `{ vision, model, provider? }` — static vision table; client gates image attach before send |
 | `POST /v1/llm/embeddings` | bearer | Returns `{ model, data: [{ embedding, index }] }` |
 | `POST /v1/sync/push` | bearer | Mutation upload (Phase A **plaintext**, not E2E) |
 | `GET /v1/sync/pull?since=cursor` | bearer | Monotonic cursor pull |
