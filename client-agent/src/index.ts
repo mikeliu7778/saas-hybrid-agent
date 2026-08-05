@@ -1,4 +1,9 @@
 export type * from "./runtime/types.js";
+export {
+  buildUserContent,
+  countImages,
+  extractText,
+} from "./runtime/contentParts.js";
 export { StubClientAgentRuntime } from "./runtime/StubClientAgentRuntime.js";
 export { DefaultClientAgentRuntime } from "./runtime/DefaultClientAgentRuntime.js";
 export { createBrowserRuntime } from "./runtime/createBrowserRuntime.js";

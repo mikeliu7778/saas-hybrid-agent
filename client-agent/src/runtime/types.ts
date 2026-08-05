@@ -45,12 +45,23 @@ export interface SubmitFeedbackInput {
   signal: TrustSignal;
 }
 
+/** Inline image payloads for runTurn (data:image/...;base64,...). */
+export type RunTurnImages = { dataUrl: string }[];
+
+export type ContentPart =
+  | { type: "text"; text: string }
+  | {
+      type: "image_url";
+      image_url: { url: string; detail?: "auto" | "low" | "high" };
+    };
+
 export interface ClientAgentRuntime {
   createSession(config?: SessionConfig): Promise<string>;
   runTurn(
     sessionId: string,
     userMessage: string,
     stream?: StreamHandler,
+    images?: RunTurnImages,
   ): Promise<TurnResult>;
   interrupt(sessionId: string): Promise<void>;
   importMemoryPack(data: Uint8Array): Promise<void>;
@@ -66,7 +77,7 @@ export interface ClientAgentRuntime {
 
 export interface LlmMessage {
   role: "system" | "user" | "assistant" | "tool";
-  content: string | null;
+  content: string | ContentPart[] | null;
   tool_calls?: LlmToolCall[];
   tool_call_id?: string;
   name?: string;
@@ -129,6 +140,8 @@ export interface MemoryOrchestrator {
     turnId: string;
     userMessage: string;
     assistantText: string;
+    /** When set, episode summary appends ` [N images]`. */
+    imageCount?: number;
   }): Promise<void>;
   applyTrust?(event: TrustEvent): Promise<void>;
   listSemantic?(): Promise<MemoryListItem[]>;

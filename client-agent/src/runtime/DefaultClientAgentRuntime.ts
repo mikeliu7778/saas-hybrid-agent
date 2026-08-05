@@ -7,6 +7,7 @@ import type {
   SyncEngine,
   TurnResult,
   MemoryListItem,
+  RunTurnImages,
 } from "./types.js";
 import { ConversationLoop, type SessionState } from "./ConversationLoop.js";
 import type { LlmTransport } from "./types.js";
@@ -17,6 +18,7 @@ import {
   TrustEventQueue,
   type TrustEventClient,
 } from "../trust/TrustEventQueue.js";
+import { extractText } from "./contentParts.js";
 
 export interface DefaultRuntimeOptions {
   llm: LlmTransport;
@@ -90,6 +92,7 @@ export class DefaultClientAgentRuntime implements ClientAgentRuntime {
     sessionId: string,
     userMessage: string,
     stream?: StreamHandler,
+    images?: RunTurnImages,
   ): Promise<TurnResult> {
     const session = this.requireSession(sessionId);
 
@@ -97,9 +100,10 @@ export class DefaultClientAgentRuntime implements ClientAgentRuntime {
     const baseSystem = session.systemPrompt.split("\n\nRelevant memory:\n")[0];
     session.systemPrompt = baseSystem;
 
+    const textOnly = extractText(userMessage);
     let recalledIds: string[] = [];
     if (this.opts.memory) {
-      const bundle = await this.opts.memory.retrieve(userMessage);
+      const bundle = await this.opts.memory.retrieve(textOnly);
       recalledIds = bundle.semantic.map((s) => s.id);
       const memBits = [
         ...bundle.semantic.map((s) => `- fact: ${s.text}`),
@@ -111,22 +115,24 @@ export class DefaultClientAgentRuntime implements ClientAgentRuntime {
       }
     }
 
-    const result = await this.loop.runTurn(session, userMessage, stream);
+    const result = await this.loop.runTurn(session, userMessage, stream, images);
     session.systemPrompt = baseSystem;
     await this.persist(session);
 
     if (this.opts.memory && result.status === "completed") {
+      const imageCount = images?.length ?? 0;
       await this.opts.memory.commitTurn({
         sessionId,
         turnId: result.turnId,
-        userMessage,
+        userMessage: textOnly,
         assistantText: result.assistantText,
+        imageCount: imageCount > 0 ? imageCount : undefined,
       });
 
       const events = this.trustCollector.onTurnCompleted({
         sessionId,
         turnId: result.turnId,
-        userMessage,
+        userMessage: textOnly,
         recalledMemoryIds: recalledIds,
         assistantText: result.assistantText,
       });

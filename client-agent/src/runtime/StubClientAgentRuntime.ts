@@ -1,6 +1,7 @@
 import type {
   ClientAgentRuntime,
   MemoryListItem,
+  RunTurnImages,
   SessionConfig,
   StreamHandler,
   SubmitFeedbackInput,
@@ -20,6 +21,7 @@ export class StubClientAgentRuntime implements ClientAgentRuntime {
     sessionId: string,
     _userMessage: string,
     _stream?: StreamHandler,
+    _images?: RunTurnImages,
   ): Promise<TurnResult> {
     return {
       sessionId,

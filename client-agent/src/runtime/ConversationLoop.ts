@@ -1,12 +1,14 @@
 import type {
   LlmMessage,
   LlmTransport,
+  RunTurnImages,
   StreamHandler,
   TurnResult,
   TurnStatus,
 } from "../runtime/types.js";
 import type { ToolHost } from "../tools/ToolHost.js";
 import { truncateToolResult } from "../tools/ToolHost.js";
+import { buildUserContent } from "./contentParts.js";
 
 export interface SessionState {
   id: string;
@@ -35,6 +37,7 @@ export class ConversationLoop {
     session: SessionState,
     userMessage: string,
     stream?: StreamHandler,
+    images?: RunTurnImages,
   ): Promise<TurnResult> {
     if (session.busy) {
       throw new Error(`SessionBusy: ${session.id}`);
@@ -47,7 +50,10 @@ export class ConversationLoop {
 
     try {
       // Align with Java: do not clear interrupt at turn start (pre-turn abort → cancelled).
-      session.messages.push({ role: "user", content: userMessage });
+      session.messages.push({
+        role: "user",
+        content: buildUserContent(userMessage, images),
+      });
       stream?.({ type: "status", status: "completed", text: "turn_started" });
 
       const toolDefs = this.deps.tools.listDefinitions(session.toolNames);

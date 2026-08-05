@@ -125,6 +125,7 @@ export class InMemoryMemoryStore implements MemoryOrchestrator {
     turnId: string;
     userMessage: string;
     assistantText: string;
+    imageCount?: number;
   }): Promise<void> {
     // Simple rule extract: "我喜欢/我偏好/I prefer" → semantic
     const pref = turnTrace.userMessage.match(/(?:我喜欢|我偏好|I prefer)\s*(.+)/i);
@@ -145,7 +146,11 @@ export class InMemoryMemoryStore implements MemoryOrchestrator {
     }
 
     if (this.episode.size < this.maxRows && turnTrace.assistantText) {
-      const summary = `${turnTrace.userMessage.slice(0, 80)} → ${turnTrace.assistantText.slice(0, 80)}`;
+      const imageNote =
+        turnTrace.imageCount && turnTrace.imageCount > 0
+          ? ` [${turnTrace.imageCount} images]`
+          : "";
+      const summary = `${turnTrace.userMessage.slice(0, 80)}${imageNote} → ${turnTrace.assistantText.slice(0, 80)}`;
       const { embedding } = await this.embed(summary);
       const id = `epi-${turnTrace.turnId}`;
       const now = new Date().toISOString();

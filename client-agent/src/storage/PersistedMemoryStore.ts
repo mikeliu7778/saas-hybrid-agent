@@ -50,6 +50,7 @@ export class PersistedMemoryStore extends InMemoryMemoryStore {
     turnId: string;
     userMessage: string;
     assistantText: string;
+    imageCount?: number;
   }): Promise<void> {
     await super.commitTurn(turnTrace);
     await this.flush();
