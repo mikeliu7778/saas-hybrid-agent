@@ -110,15 +110,20 @@ async function refreshMemory() {
   }
 }
 
+function selectedProvider() {
+  return $("provider").value || "openai";
+}
+
 /**
  * OPFS browser runtime, or in-memory fallback with the same trust wiring.
  */
-async function createRuntime(baseUrl, tok, devId) {
+async function createRuntime(baseUrl, tok, devId, provider) {
   try {
     const { runtime: rt } = await createBrowserRuntime({
       baseUrl,
       token: tok,
       deviceId: devId,
+      provider,
     });
     return { runtime: rt, mode: "opfs" };
   } catch (err) {
@@ -137,7 +142,7 @@ async function createRuntime(baseUrl, tok, devId) {
       deviceId: devId,
       embed: (text) => embedClient.embed(text),
     });
-    const llm = new HttpLlmTransport({ baseUrl, token: tok });
+    const llm = new HttpLlmTransport({ baseUrl, token: tok, provider });
     const trustCollector = new TrustSignalCollector({ deviceId: devId });
     const trustQueue = new TrustEventQueue();
     const trustClient = new HttpTrustEventClient({ baseUrl, token: tok });
@@ -172,13 +177,14 @@ async function registerDevice() {
       JSON.stringify({ baseUrl, deviceId, token }),
     );
 
-    const created = await createRuntime(baseUrl, token, deviceId);
+    const provider = selectedProvider();
+    const created = await createRuntime(baseUrl, token, deviceId, provider);
     runtime = created.runtime;
     mode = created.mode;
     runtime.setTrustReportingEnabled($("reportTrust").checked);
     sessionId = await runtime.createSession();
     setStatus(
-      `已注册 device=${deviceId.slice(0, 8)}… mode=${mode} session=${sessionId.slice(0, 8)}…`,
+      `已注册 device=${deviceId.slice(0, 8)}… provider=${provider} mode=${mode} session=${sessionId.slice(0, 8)}…`,
     );
     await refreshMemory();
   } catch (e) {
@@ -244,6 +250,23 @@ $("reportTrust").onchange = (ev) => {
   if (runtime) runtime.setTrustReportingEnabled(ev.target.checked);
 };
 
+async function recreateRuntimeIfRegistered() {
+  if (!token || !deviceId) return;
+  const baseUrl = $("baseUrl").value.replace(/\/$/, "");
+  const provider = selectedProvider();
+  const created = await createRuntime(baseUrl, token, deviceId, provider);
+  runtime = created.runtime;
+  mode = created.mode;
+  runtime.setTrustReportingEnabled($("reportTrust").checked);
+  sessionId = await runtime.createSession();
+  setStatus(
+    `已切换 provider=${provider} mode=${mode} session=${sessionId.slice(0, 8)}…`,
+  );
+  await refreshMemory();
+}
+
+$("provider").onchange = () => void recreateRuntimeIfRegistered();
+
 // Optional: restore prior token + re-init runtime on reload
 (async () => {
   try {
@@ -254,13 +277,14 @@ $("reportTrust").onchange = (ev) => {
     $("baseUrl").value = saved.baseUrl;
     deviceId = saved.deviceId;
     token = saved.token;
-    const created = await createRuntime(saved.baseUrl, saved.token, saved.deviceId);
+    const provider = selectedProvider();
+    const created = await createRuntime(saved.baseUrl, saved.token, saved.deviceId, provider);
     runtime = created.runtime;
     mode = created.mode;
     runtime.setTrustReportingEnabled($("reportTrust").checked);
     sessionId = await runtime.createSession();
     setStatus(
-      `已恢复 device=${deviceId.slice(0, 8)}… mode=${mode}（可重新注册）`,
+      `已恢复 device=${deviceId.slice(0, 8)}… provider=${provider} mode=${mode}（可重新注册）`,
     );
     await refreshMemory();
   } catch {

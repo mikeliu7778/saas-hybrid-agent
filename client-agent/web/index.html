@@ -31,6 +31,13 @@
     <p>可交互演示：对话 + 显式采信 + Memory 删除（非写死脚本）。</p>
     <div class="row">
       <input id="baseUrl" value="http://localhost:8080" size="40" />
+      <label>
+        LLM
+        <select id="provider">
+          <option value="openai">openai</option>
+          <option value="cursor">cursor</option>
+        </select>
+      </label>
       <button id="register">注册设备</button>
       <label><input type="checkbox" id="reportTrust" checked /> 上报采信</label>
     </div>

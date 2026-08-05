@@ -149,6 +149,27 @@ describe("HttpLlmTransport (real LLM gateway)", () => {
     expect(result.tool_calls[0].function.name).toBe("http_request");
   });
 
+  it("includes provider in POST body when set", async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response(
+        JSON.stringify({ content: "ok", tool_calls: [], finish_reason: "stop" }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const llm = new HttpLlmTransport({
+      baseUrl: "http://gw",
+      token: "t",
+      provider: "cursor",
+    });
+    await llm.complete([{ role: "user", content: "hi" }], []);
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(String(init.body));
+    expect(body.provider).toBe("cursor");
+  });
+
   it("throws on 401", async () => {
     vi.stubGlobal(
       "fetch",

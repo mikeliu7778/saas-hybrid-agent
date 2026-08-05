@@ -19,6 +19,7 @@ export interface CreateBrowserRuntimeOptions {
   baseUrl: string;
   token: string;
   model?: string;
+  provider?: string;
   embeddingModel?: string;
   httpAllowlist?: string[];
   /** Inject for tests; defaults to navigator.storage.getDirectory() */
@@ -58,6 +59,7 @@ export async function createBrowserRuntime(opts: CreateBrowserRuntimeOptions) {
     baseUrl: opts.baseUrl,
     token: opts.token,
     model: opts.model,
+    provider: opts.provider,
   });
   const sessionStore = new PersistedSessionStore(kv);
   const deviceId = opts.deviceId ?? "web";

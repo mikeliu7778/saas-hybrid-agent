@@ -11,6 +11,7 @@ export interface HttpLlmTransportOptions {
   baseUrl: string;
   token: string;
   model?: string;
+  provider?: string;
   fetchImpl?: typeof fetch;
 }
 
@@ -27,6 +28,7 @@ export class HttpLlmTransport implements LlmTransport {
   private readonly baseUrl: string;
   private readonly token: string;
   private readonly model?: string;
+  private readonly provider?: string;
   private readonly fetchImpl: typeof fetch;
 
   /** Last cursor observed from the most recent complete/stream call. */
@@ -36,6 +38,7 @@ export class HttpLlmTransport implements LlmTransport {
     this.baseUrl = opts.baseUrl.replace(/\/$/, "");
     this.token = opts.token;
     this.model = opts.model;
+    this.provider = opts.provider;
     this.fetchImpl = opts.fetchImpl ?? fetch.bind(globalThis);
   }
 
@@ -47,13 +50,7 @@ export class HttpLlmTransport implements LlmTransport {
     const res = await this.fetchImpl(`${this.baseUrl}/v1/llm/chat`, {
       method: "POST",
       headers: this.headers("application/json", options?.cursor),
-      body: JSON.stringify({
-        model: this.model,
-        messages: toWireMessages(messages),
-        tools,
-        stream: false,
-        cursor: options?.cursor,
-      }),
+      body: JSON.stringify(this.chatBody(messages, tools, false, options?.cursor)),
       signal: options?.signal,
     });
     if (!res.ok) {
@@ -84,13 +81,7 @@ export class HttpLlmTransport implements LlmTransport {
     const res = await this.fetchImpl(`${this.baseUrl}/v1/llm/chat`, {
       method: "POST",
       headers: this.headers("text/event-stream", since),
-      body: JSON.stringify({
-        model: this.model,
-        messages: toWireMessages(messages),
-        tools,
-        stream: true,
-        cursor: since,
-      }),
+      body: JSON.stringify(this.chatBody(messages, tools, true, since)),
       signal: options?.signal,
     });
     if (!res.ok) {
@@ -141,6 +132,23 @@ export class HttpLlmTransport implements LlmTransport {
       finish_reason: finishReason ?? (toolCalls.length ? "tool_calls" : "stop"),
       cursor: lastCursor,
     };
+  }
+
+  private chatBody(
+    messages: LlmMessage[],
+    tools: LlmToolDefinition[],
+    stream: boolean,
+    cursor?: string,
+  ): Record<string, unknown> {
+    const body: Record<string, unknown> = {
+      model: this.model,
+      messages: toWireMessages(messages),
+      tools,
+      stream,
+      cursor,
+    };
+    if (this.provider) body.provider = this.provider;
+    return body;
   }
 
   private headers(accept: string, cursor?: string): Record<string, string> {
