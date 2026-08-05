@@ -5,6 +5,8 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.springframework.ai.chat.messages.AssistantMessage;
@@ -26,6 +28,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.github.saashybridagent.config.SaasHybridAgentProperties;
 import com.github.saashybridagent.controlplane.dto.ChatMessageDto;
 import com.github.saashybridagent.controlplane.dto.LlmChatRequest;
 import com.github.saashybridagent.controlplane.quota.QuotaService;
@@ -39,21 +42,34 @@ public class LlmGatewayService {
   private final QuotaService quotaService;
   private final RateLimiter rateLimiter;
   private final ObjectMapper objectMapper;
+  private final SaasHybridAgentProperties properties;
+  private final CursorSidecarClient cursorSidecarClient;
   private final AtomicLong globalCursor = new AtomicLong(0);
+  private final ExecutorService streamExecutor = Executors.newCachedThreadPool();
 
   public LlmGatewayService(
       ChatModel chatModel,
       QuotaService quotaService,
       RateLimiter rateLimiter,
-      ObjectMapper objectMapper) {
+      ObjectMapper objectMapper,
+      SaasHybridAgentProperties properties,
+      CursorSidecarClient cursorSidecarClient) {
     this.chatModel = chatModel;
     this.quotaService = quotaService;
     this.rateLimiter = rateLimiter;
     this.objectMapper = objectMapper;
+    this.properties = properties;
+    this.cursorSidecarClient = cursorSidecarClient;
   }
 
   public Map<String, Object> complete(LlmChatRequest request, String userId) {
     ensureAllowed(userId);
+    if (isCursor(effectiveProvider(request))) {
+      Map<String, Object> body = cursorSidecarClient.complete(request);
+      quotaService.recordLlmTokens(userId, 1);
+      body.put("cursor", nextCursor(request.cursor()));
+      return body;
+    }
     ChatResponse response = chatModel.call(toPrompt(request));
     quotaService.recordLlmTokens(userId, extractTokens(response));
     Map<String, Object> body = toJsonResponse(response);
@@ -65,6 +81,30 @@ public class LlmGatewayService {
     ensureAllowed(userId);
     SseEmitter emitter = new SseEmitter(0L);
     AtomicLong seq = new AtomicLong(parseCursor(request.cursor()));
+    if (isCursor(effectiveProvider(request))) {
+      streamExecutor.execute(
+          () -> {
+            try {
+              cursorSidecarClient.stream(request, emitter, seq, this::sendEvent);
+              quotaService.recordLlmTokens(userId, 1);
+              emitter.complete();
+            } catch (CursorSidecarException ex) {
+              try {
+                Map<String, Object> error = new LinkedHashMap<>();
+                error.put("type", "error");
+                error.put("code", ex.getCode());
+                error.put("message", ex.getMessage());
+                sendEvent(emitter, error, seq);
+                emitter.complete();
+              } catch (IOException io) {
+                emitter.completeWithError(ex);
+              }
+            } catch (Exception ex) {
+              emitter.completeWithError(ex);
+            }
+          });
+      return emitter;
+    }
     Flux<ChatResponse> flux = chatModel.stream(toPrompt(request));
     flux.subscribe(
         chunk -> {
@@ -99,6 +139,19 @@ public class LlmGatewayService {
     }
   }
 
+  String effectiveProvider(LlmChatRequest request) {
+    String provider = request.provider();
+    if (provider != null && !provider.isBlank()) {
+      return provider.trim();
+    }
+    String defaults = properties.getLlm().getDefaultProvider();
+    return defaults == null || defaults.isBlank() ? "openai" : defaults.trim();
+  }
+
+  private static boolean isCursor(String provider) {
+    return "cursor".equalsIgnoreCase(provider);
+  }
+
   private void emitChunk(SseEmitter emitter, ChatResponse chunk, AtomicLong seq) throws IOException {
     Generation generation = chunk.getResult();
     if (generation == null || generation.getOutput() == null) {
@@ -124,7 +177,7 @@ public class LlmGatewayService {
     }
   }
 
-  private void sendEvent(SseEmitter emitter, Map<String, Object> payload, AtomicLong seq)
+  void sendEvent(SseEmitter emitter, Map<String, Object> payload, AtomicLong seq)
       throws IOException {
     String cursor = Long.toString(seq.incrementAndGet());
     Map<String, Object> body = new LinkedHashMap<>(payload);

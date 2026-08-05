@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import com.github.saashybridagent.api.dto.ErrorResponse;
+import com.github.saashybridagent.controlplane.llm.CursorSidecarException;
 import com.github.saashybridagent.controlplane.llm.LlmGatewayService.RateLimitExceededException;
 
 @RestControllerAdvice
@@ -16,6 +17,12 @@ public class ApiExceptionHandler {
   public ResponseEntity<ErrorResponse> rateLimited(RateLimitExceededException ex) {
     return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
         .body(ErrorResponse.of("rate_limited", ex.getMessage()));
+  }
+
+  @ExceptionHandler(CursorSidecarException.class)
+  public ResponseEntity<ErrorResponse> cursor(CursorSidecarException ex) {
+    return ResponseEntity.status(ex.getStatus())
+        .body(ErrorResponse.of(ex.getCode(), ex.getMessage()));
   }
 
   @ExceptionHandler(IllegalArgumentException.class)
