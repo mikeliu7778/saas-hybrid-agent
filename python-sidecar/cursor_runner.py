@@ -64,12 +64,22 @@ class CursorSdkRunner:
             return env_cwd
         return os.getcwd()
 
-    def run_complete(self, prompt: str, model: str | None, cwd: str | None) -> str:
-        chunks = list(self.run_stream(prompt, model, cwd))
+    def run_complete(
+        self,
+        prompt: str,
+        model: str | None,
+        cwd: str | None,
+        images: list[dict[str, str]] | None = None,
+    ) -> str:
+        chunks = list(self.run_stream(prompt, model, cwd, images=images))
         return "".join(chunks)
 
     def run_stream(
-        self, prompt: str, model: str | None, cwd: str | None
+        self,
+        prompt: str,
+        model: str | None,
+        cwd: str | None,
+        images: list[dict[str, str]] | None = None,
     ) -> Iterator[str]:
         api_key = self._require_api_key()
         resolved_model = self._resolve_model(model)
@@ -83,7 +93,10 @@ class CursorSdkRunner:
                 model=resolved_model,
                 local=LocalAgentOptions(cwd=resolved_cwd),
             ) as agent:
-                run = agent.send(prompt)
+                if images:
+                    run = agent.send({"text": prompt, "images": images})
+                else:
+                    run = agent.send(prompt)
                 for event in run.stream():
                     if event.type != "assistant":
                         continue

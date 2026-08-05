@@ -4,10 +4,10 @@ from app import create_app
 
 
 class AuthFailRunner:
-    def run_complete(self, prompt, model, cwd):
+    def run_complete(self, prompt, model, cwd, images=None):
         raise RuntimeError("401 Unauthorized: invalid api key")
 
-    def run_stream(self, prompt, model, cwd):
+    def run_stream(self, prompt, model, cwd, images=None):
         raise RuntimeError("401 Unauthorized: invalid api key")
         yield ""  # pragma: no cover
 

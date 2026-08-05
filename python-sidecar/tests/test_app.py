@@ -4,11 +4,11 @@ from app import create_app
 
 
 class FakeRunner:
-    def run_complete(self, prompt, model, cwd):
+    def run_complete(self, prompt, model, cwd, images=None):
         assert "user:" in prompt
         return "hello from fake"
 
-    def run_stream(self, prompt, model, cwd):
+    def run_stream(self, prompt, model, cwd, images=None):
         yield "hel"
         yield "lo"
 

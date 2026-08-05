@@ -149,7 +149,11 @@ public class CursorSidecarClient {
       for (ChatMessageDto dto : request.messages()) {
         Map<String, Object> msg = new LinkedHashMap<>();
         msg.put("role", dto.role() == null ? "user" : dto.role());
-        msg.put("content", MultimodalContent.asPlainText(dto.content()));
+        msg.put(
+            "content",
+            dto.content() == null || dto.content().isNull()
+                ? ""
+                : objectMapper.convertValue(dto.content(), Object.class));
         messages.add(msg);
       }
     }
