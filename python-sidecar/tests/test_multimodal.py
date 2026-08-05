@@ -39,6 +39,22 @@ class CapturingRunner:
         yield "ok"
 
 
+def test_truncates_to_five_images_keeps_newest():
+    parts = [{"type": "text", "text": "many images"}]
+    for i in range(6):
+        parts.append({
+            "type": "image_url",
+            "image_url": {"url": f"data:image/png;base64,img{i}"},
+        })
+    prompt, images = messages_to_prompt_and_images(
+        [{"role": "user", "content": parts}]
+    )
+    assert len(images) == 5
+    assert images[0]["data"] == "img1"
+    assert images[4]["data"] == "img5"
+    assert "[image omitted]" in prompt
+
+
 def test_complete_passes_images_to_runner():
     from fastapi.testclient import TestClient
     from app import create_app

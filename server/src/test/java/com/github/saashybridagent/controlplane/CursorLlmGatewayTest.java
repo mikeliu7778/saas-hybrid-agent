@@ -155,6 +155,43 @@ class CursorLlmGatewayTest {
   }
 
   @Test
+  void cursorProviderForwardsMultimodalContentPartsAsJsonArray() throws Exception {
+    mode = Mode.JSON_OK;
+    JsonNode registered = registerDevice("cursor-multimodal", "web");
+    String token = registered.get("token").asText();
+
+    mockMvc
+        .perform(
+            post("/v1/llm/chat")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {
+                      "provider":"cursor",
+                      "model":"gpt-4o-mini",
+                      "messages":[{
+                        "role":"user",
+                        "content":[
+                          {"type":"text","text":"describe"},
+                          {"type":"image_url","image_url":{"url":"data:image/png;base64,aGVsbG8="}}
+                        ]
+                      }],
+                      "stream":false
+                    }
+                    """))
+        .andExpect(status().isOk());
+
+    JsonNode sidecar = objectMapper.readTree(lastRequestBody.get());
+    JsonNode content = sidecar.path("messages").get(0).path("content");
+    assertThat(content.isArray()).isTrue();
+    assertThat(content.get(0).path("type").asText()).isEqualTo("text");
+    assertThat(content.get(1).path("type").asText()).isEqualTo("image_url");
+    assertThat(content.get(1).path("image_url").path("url").asText())
+        .startsWith("data:image/png;base64,");
+  }
+
+  @Test
   void cursorProviderNonStreamUsesSidecarNotChatModel() throws Exception {
     mode = Mode.JSON_OK;
     JsonNode registered = registerDevice("cursor-json", "web");
