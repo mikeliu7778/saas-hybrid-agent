@@ -20,6 +20,14 @@
       #status { color: #444; font-size: 0.9rem; }
       #mem { list-style: none; padding: 0; }
       #mem li { margin: 0.4rem 0; font-size: 0.9rem; word-break: break-word; }
+      #imagePreview { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.4rem 0; }
+      #imagePreview .thumb { position: relative; width: 72px; height: 72px; }
+      #imagePreview .thumb img, .msg img.thumb-img {
+        width: 72px; height: 72px; object-fit: cover; border: 1px solid #ccc; display: block;
+      }
+      #imagePreview .thumb button {
+        position: absolute; top: 0; right: 0; padding: 0 0.25rem; font-size: 0.75rem; line-height: 1.2;
+      }
       @media (max-width: 720px) {
         .layout { grid-template-columns: 1fr; }
         aside { border-left: none; border-top: 1px solid #ddd; padding-left: 0; padding-top: 1rem; }
@@ -45,8 +53,11 @@
     <div class="layout">
       <main>
         <div id="log"></div>
+        <div id="imagePreview"></div>
         <div class="row">
           <input id="msg" style="flex:1" placeholder="输入消息…" />
+          <input type="file" id="imageFile" accept="image/png,image/jpeg,image/gif,image/webp" multiple hidden />
+          <button id="attachImage" disabled>附图片</button>
           <button id="send">发送</button>
         </div>
       </main>

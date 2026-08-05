@@ -16,9 +16,13 @@ import {
   HttpTrustEventClient,
   TrustEventQueue,
   TrustSignalCollector,
+  fetchLlmCapabilities,
 } from "../dist/index.js";
 
 const $ = (id) => document.getElementById(id);
+
+const MAX_IMAGES = 5;
+const IMAGE_MIME = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"]);
 
 /** @type {import("../dist/index.js").ClientAgentRuntime | null} */
 let runtime = null;
@@ -26,17 +30,65 @@ let sessionId = null;
 let deviceId = null;
 let token = null;
 let mode = "";
+/** @type {{ dataUrl: string }[]} */
+let pendingImages = [];
+let vision = false;
 
 function setStatus(text) {
   $("status").textContent = text;
 }
 
-function appendBubble(role, text, turnMeta) {
+function renderImagePreview() {
+  const box = $("imagePreview");
+  box.innerHTML = "";
+  pendingImages.forEach((img, idx) => {
+    const wrap = document.createElement("div");
+    wrap.className = "thumb";
+    const el = document.createElement("img");
+    el.src = img.dataUrl;
+    el.alt = `preview-${idx}`;
+    const rm = document.createElement("button");
+    rm.type = "button";
+    rm.textContent = "×";
+    rm.title = "移除";
+    rm.onclick = () => {
+      pendingImages.splice(idx, 1);
+      renderImagePreview();
+    };
+    wrap.append(el, rm);
+    box.appendChild(wrap);
+  });
+}
+
+/**
+ * @param {string} role
+ * @param {string} text
+ * @param {{ turnMeta?: unknown, dataUrls?: string[] }} [opts]
+ */
+function appendBubble(role, text, opts) {
+  const turnMeta = opts?.turnMeta;
+  const dataUrls = opts?.dataUrls;
   const log = $("log");
   const div = document.createElement("div");
   div.className = `msg ${role}`;
   const label = role === "user" ? "你" : "助手";
   div.appendChild(document.createTextNode(`${label}: ${text}`));
+
+  if (role === "user" && dataUrls?.length) {
+    const thumbs = document.createElement("div");
+    thumbs.style.display = "flex";
+    thumbs.style.flexWrap = "wrap";
+    thumbs.style.gap = "0.35rem";
+    thumbs.style.marginTop = "0.35rem";
+    for (const url of dataUrls) {
+      const img = document.createElement("img");
+      img.className = "thumb-img";
+      img.src = url;
+      img.alt = "attached";
+      thumbs.appendChild(img);
+    }
+    div.appendChild(thumbs);
+  }
 
   if (role === "assistant" && turnMeta) {
     const fb = document.createElement("span");
@@ -114,6 +166,34 @@ function selectedProvider() {
   return $("provider").value || "openai";
 }
 
+async function refreshCapabilities() {
+  const attach = $("attachImage");
+  if (!token) {
+    vision = false;
+    attach.disabled = true;
+    return;
+  }
+  try {
+    const baseUrl = $("baseUrl").value.replace(/\/$/, "");
+    const caps = await fetchLlmCapabilities({
+      baseUrl,
+      token,
+      provider: selectedProvider(),
+    });
+    vision = caps.vision;
+    attach.disabled = !vision;
+    if (pendingImages.length && !vision) {
+      setStatus(
+        `当前模型 ${caps.model} 不支持 vision；已保留预览，请换模型后再发`,
+      );
+    }
+  } catch (e) {
+    vision = false;
+    attach.disabled = true;
+    setStatus(`能力查询失败: ${e instanceof Error ? e.message : String(e)}`);
+  }
+}
+
 /**
  * OPFS browser runtime, or in-memory fallback with the same trust wiring.
  */
@@ -159,6 +239,38 @@ async function createRuntime(baseUrl, tok, devId, provider) {
   }
 }
 
+/**
+ * @param {File} file
+ * @returns {Promise<string>}
+ */
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error ?? new Error("read failed"));
+    reader.readAsDataURL(file);
+  });
+}
+
+/**
+ * @param {File[]} files
+ */
+async function addImageFiles(files) {
+  for (const file of files) {
+    if (pendingImages.length >= MAX_IMAGES) {
+      setStatus(`最多附 ${MAX_IMAGES} 张图片`);
+      break;
+    }
+    if (!IMAGE_MIME.has(file.type)) {
+      setStatus(`不支持的图片类型: ${file.type || file.name}`);
+      continue;
+    }
+    const dataUrl = await readFileAsDataUrl(file);
+    pendingImages.push({ dataUrl });
+  }
+  renderImagePreview();
+}
+
 async function registerDevice() {
   const baseUrl = $("baseUrl").value.replace(/\/$/, "");
   setStatus("注册中…");
@@ -186,6 +298,7 @@ async function registerDevice() {
     setStatus(
       `已注册 device=${deviceId.slice(0, 8)}… provider=${provider} mode=${mode} session=${sessionId.slice(0, 8)}…`,
     );
+    await refreshCapabilities();
     await refreshMemory();
   } catch (e) {
     setStatus(`注册失败: ${e instanceof Error ? e.message : String(e)}`);
@@ -199,19 +312,32 @@ async function sendMessage() {
   }
   const input = $("msg");
   const text = input.value.trim();
-  if (!text) return;
+  if (!text && pendingImages.length === 0) return;
+  if (pendingImages.length && !vision) {
+    setStatus("当前模型不支持 vision，请更换模型后再发送（预览已保留）");
+    return;
+  }
+  const images = pendingImages.map((p) => ({ dataUrl: p.dataUrl }));
+  const dataUrls = images.map((p) => p.dataUrl);
   input.value = "";
-  appendBubble("user", text);
+  appendBubble("user", text || "(图片)", { dataUrls });
 
   const assistantEl = appendBubble("assistant", "…");
   let streamed = "";
   try {
-    const result = await runtime.runTurn(sessionId, text, (delta) => {
-      if (delta.type === "text" && delta.text) {
-        streamed += delta.text;
-        assistantEl.firstChild.textContent = `助手: ${streamed}`;
-      }
-    });
+    const result = await runtime.runTurn(
+      sessionId,
+      text || " ",
+      (delta) => {
+        if (delta.type === "text" && delta.text) {
+          streamed += delta.text;
+          assistantEl.firstChild.textContent = `助手: ${streamed}`;
+        }
+      },
+      images.length ? images : undefined,
+    );
+    pendingImages = [];
+    renderImagePreview();
     const finalText = result.assistantText || streamed || "(空回复)";
     assistantEl.replaceChildren();
     assistantEl.appendChild(document.createTextNode(`助手: ${finalText}`));
@@ -240,6 +366,32 @@ async function sendMessage() {
 
 $("register").onclick = () => void registerDevice();
 $("send").onclick = () => void sendMessage();
+$("attachImage").onclick = () => $("imageFile").click();
+$("imageFile").onchange = () => {
+  const input = $("imageFile");
+  const files = Array.from(input.files || []);
+  input.value = "";
+  void addImageFiles(files);
+};
+
+function handlePaste(ev) {
+  const items = ev.clipboardData?.items;
+  if (!items) return;
+  const files = [];
+  for (const item of items) {
+    if (item.kind === "file" && item.type.startsWith("image/")) {
+      const f = item.getAsFile();
+      if (f) files.push(f);
+    }
+  }
+  if (files.length === 0) return;
+  ev.preventDefault();
+  void addImageFiles(files);
+}
+
+$("msg").addEventListener("paste", handlePaste);
+document.addEventListener("paste", handlePaste);
+
 $("msg").addEventListener("keydown", (ev) => {
   if (ev.key === "Enter") {
     ev.preventDefault();
@@ -262,6 +414,7 @@ async function recreateRuntimeIfRegistered() {
   setStatus(
     `已切换 provider=${provider} mode=${mode} session=${sessionId.slice(0, 8)}…`,
   );
+  await refreshCapabilities();
   await refreshMemory();
 }
 
@@ -286,6 +439,7 @@ $("provider").onchange = () => void recreateRuntimeIfRegistered();
     setStatus(
       `已恢复 device=${deviceId.slice(0, 8)}… provider=${provider} mode=${mode}（可重新注册）`,
     );
+    await refreshCapabilities();
     await refreshMemory();
   } catch {
     /* ignore stale localStorage */

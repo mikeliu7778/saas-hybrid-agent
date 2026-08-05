@@ -13,6 +13,11 @@ export { MockLlmTransport } from "./llm/MockLlmTransport.js";
 export type { MockLlmScriptStep } from "./llm/MockLlmTransport.js";
 export { HttpLlmTransport, parseSseJsonEvents, compareCursor } from "./llm/HttpLlmTransport.js";
 export type { SseJsonEvent } from "./llm/HttpLlmTransport.js";
+export { fetchLlmCapabilities } from "./llm/HttpLlmCapabilities.js";
+export type {
+  FetchLlmCapabilitiesOptions,
+  LlmCapabilities,
+} from "./llm/HttpLlmCapabilities.js";
 export { HttpEmbeddingClient } from "./llm/HttpEmbeddingClient.js";
 export { InMemorySyncBackend } from "./sync/InMemorySyncBackend.js";
 export { LocalSyncEngine } from "./sync/LocalSyncEngine.js";
