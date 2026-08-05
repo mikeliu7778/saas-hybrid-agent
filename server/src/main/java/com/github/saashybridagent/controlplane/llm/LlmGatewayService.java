@@ -66,7 +66,7 @@ public class LlmGatewayService {
   }
 
   public Map<String, Object> complete(LlmChatRequest request, String userId) {
-    String effectiveModel = request.model() != null ? request.model() : defaultModel;
+    String effectiveModel = effectiveModel(request);
     MultimodalContent.validate(request.messages(), effectiveModel);
     ensureAllowed(userId);
     if (isCursor(effectiveProvider(request))) {
@@ -83,7 +83,7 @@ public class LlmGatewayService {
   }
 
   public SseEmitter stream(LlmChatRequest request, String userId) {
-    String effectiveModel = request.model() != null ? request.model() : defaultModel;
+    String effectiveModel = effectiveModel(request);
     MultimodalContent.validate(request.messages(), effectiveModel);
     ensureAllowed(userId);
     SseEmitter emitter = new SseEmitter(0L);
@@ -144,6 +144,11 @@ public class LlmGatewayService {
     if (quotaService.isLlmOverLimit(userId)) {
       throw new RateLimitExceededException("LLM token quota exceeded");
     }
+  }
+
+  String effectiveModel(LlmChatRequest request) {
+    String model = request.model();
+    return model == null || model.isBlank() ? defaultModel : model;
   }
 
   String effectiveProvider(LlmChatRequest request) {

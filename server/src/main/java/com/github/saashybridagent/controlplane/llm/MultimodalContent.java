@@ -1,12 +1,13 @@
 package com.github.saashybridagent.controlplane.llm;
 
-import java.net.URI;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -16,8 +17,17 @@ import org.springframework.core.io.ByteArrayResource;
 import org.springframework.util.MimeTypeUtils;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.github.saashybridagent.controlplane.dto.ChatMessageDto;
 
+/**
+ * Multimodal content helpers for chat messages.
+ *
+ * <p>Phase 1 accepts only {@code data:} image URIs. {@code http(s)://} URL shape is reserved in the
+ * protocol but rejected with {@code image_unsupported}. When a request carries more than {@link
+ * #MAX_IMAGES} image parts (e.g. historical re-send), oldest {@code image_url} parts are dropped in
+ * place so accumulation alone does not 400 — aligned with the Cursor sidecar keep-newest behavior.
+ */
 public final class MultimodalContent {
   public static final int MAX_IMAGES = 5;
   public static final int MAX_BYTES = 4 * 1024 * 1024;
@@ -40,7 +50,13 @@ public final class MultimodalContent {
     return count;
   }
 
+  /**
+   * Drops oldest {@code image_url} parts until ≤ {@link #MAX_IMAGES}, then validates remaining
+   * images (role / MIME / size / data-URI-only). Mutates message content arrays in place when
+   * truncation is needed so the outbound request matches what was accepted.
+   */
   public static void validate(List<ChatMessageDto> messages, String effectiveModel) {
+    dropOldestImagesBeyondLimit(messages);
     int imageCount = 0;
     if (messages != null) {
       for (ChatMessageDto msg : messages) {
@@ -70,10 +86,6 @@ public final class MultimodalContent {
           imageCount++;
         }
       }
-    }
-    if (imageCount > MAX_IMAGES) {
-      throw new MultimodalValidationException(
-          "image_limit", "at most " + MAX_IMAGES + " images are allowed per request");
     }
     if (imageCount > 0 && !ModelVisionCapabilities.supportsVision(effectiveModel)) {
       throw new MultimodalValidationException(
@@ -124,31 +136,35 @@ public final class MultimodalContent {
         text.append(part.path("text").asText(""));
       } else if ("image_url".equals(type)) {
         String url = part.path("image_url").path("url").asText(null);
-        Media image = toMedia(url);
-        if (image != null) {
-          media.add(image);
-        }
+        media.add(toMedia(url));
       }
     }
     return UserMessage.builder().text(text.toString()).media(media).build();
   }
 
-  private static Media toMedia(String url) {
+  static Media toMedia(String url) {
     if (url == null || url.isBlank()) {
-      return null;
+      throw new MultimodalValidationException("image_unsupported", "image url is missing");
     }
     if (url.startsWith("http://") || url.startsWith("https://")) {
-      return new Media(MimeTypeUtils.IMAGE_PNG, URI.create(url));
+      throw new MultimodalValidationException(
+          "image_unsupported", "http(s) image urls are not accepted in phase 1; use data URIs");
     }
     Matcher matcher = DATA_URI.matcher(url);
     if (!matcher.matches()) {
-      return null;
+      throw new MultimodalValidationException(
+          "image_unsupported", "unsupported image url or MIME type");
     }
     String mime = matcher.group(1);
     if ("image/jpg".equals(mime)) {
       mime = "image/jpeg";
     }
-    byte[] bytes = Base64.getDecoder().decode(matcher.group(3));
+    byte[] bytes;
+    try {
+      bytes = Base64.getDecoder().decode(matcher.group(3));
+    } catch (IllegalArgumentException ex) {
+      throw new MultimodalValidationException("image_unsupported", "invalid base64 image payload");
+    }
     return new Media(MimeTypeUtils.parseMimeType(mime), new ByteArrayResource(bytes));
   }
 
@@ -197,6 +213,55 @@ public final class MultimodalContent {
     return parts;
   }
 
+  /**
+   * When more than {@link #MAX_IMAGES} image_url parts are present, remove the oldest ones (first in
+   * message order) by mutating ArrayNode content in place. Non-ArrayNode content is left unchanged.
+   */
+  private static void dropOldestImagesBeyondLimit(List<ChatMessageDto> messages) {
+    if (messages == null) {
+      return;
+    }
+    List<int[]> locs = new ArrayList<>();
+    for (int mi = 0; mi < messages.size(); mi++) {
+      ChatMessageDto msg = messages.get(mi);
+      if (msg == null) {
+        continue;
+      }
+      JsonNode content = msg.content();
+      if (content == null || !content.isArray()) {
+        continue;
+      }
+      for (int pi = 0; pi < content.size(); pi++) {
+        JsonNode part = content.get(pi);
+        if (part != null
+            && part.isObject()
+            && "image_url".equals(textOrNull(part.get("type")))) {
+          locs.add(new int[] {mi, pi});
+        }
+      }
+    }
+    if (locs.size() <= MAX_IMAGES) {
+      return;
+    }
+    int dropCount = locs.size() - MAX_IMAGES;
+    Map<Integer, List<Integer>> byMsg = new TreeMap<>();
+    for (int i = 0; i < dropCount; i++) {
+      int[] loc = locs.get(i);
+      byMsg.computeIfAbsent(loc[0], k -> new ArrayList<>()).add(loc[1]);
+    }
+    for (Map.Entry<Integer, List<Integer>> entry : byMsg.entrySet()) {
+      JsonNode content = messages.get(entry.getKey()).content();
+      if (!(content instanceof ArrayNode array)) {
+        continue;
+      }
+      List<Integer> indices = entry.getValue();
+      indices.sort(Comparator.reverseOrder());
+      for (int idx : indices) {
+        array.remove(idx);
+      }
+    }
+  }
+
   private static int countImagesInContent(JsonNode content) {
     if (content == null || !content.isArray()) {
       return 0;
@@ -215,7 +280,8 @@ public final class MultimodalContent {
       throw new MultimodalValidationException("image_unsupported", "image url is missing");
     }
     if (url.startsWith("http://") || url.startsWith("https://")) {
-      return;
+      throw new MultimodalValidationException(
+          "image_unsupported", "http(s) image urls are not accepted in phase 1; use data URIs");
     }
     Matcher matcher = DATA_URI.matcher(url);
     if (!matcher.matches()) {

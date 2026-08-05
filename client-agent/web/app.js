@@ -195,6 +195,20 @@ async function refreshCapabilities() {
 }
 
 /**
+ * Reuse hydrated OPFS session when present; otherwise create a fresh one.
+ * @param {import("../dist/index.js").DefaultClientAgentRuntime | import("../dist/index.js").ClientAgentRuntime} rt
+ */
+async function resolveSessionId(rt) {
+  if (typeof rt.hydrateSessions === "function") {
+    const ids = await rt.hydrateSessions();
+    if (Array.isArray(ids) && ids.length > 0) {
+      return ids[ids.length - 1];
+    }
+  }
+  return rt.createSession();
+}
+
+/**
  * OPFS browser runtime, or in-memory fallback with the same trust wiring.
  */
 async function createRuntime(baseUrl, tok, devId, provider) {
@@ -303,6 +317,7 @@ async function registerDevice() {
     mode = created.mode;
     runtime.setTrustReportingEnabled($("reportTrust").checked);
     sessionId = await runtime.createSession();
+    $("log").innerHTML = "";
     setStatus(
       `已注册 device=${deviceId.slice(0, 8)}… provider=${provider} mode=${mode} session=${sessionId.slice(0, 8)}…`,
     );
@@ -373,6 +388,7 @@ async function sendMessage() {
 }
 
 $("register").onclick = () => void registerDevice();
+$("newSession").onclick = () => void startNewSession();
 $("send").onclick = () => void sendMessage();
 $("attachImage").onclick = () => $("imageFile").click();
 $("imageFile").onchange = () => {
@@ -418,12 +434,24 @@ async function recreateRuntimeIfRegistered() {
   runtime = created.runtime;
   mode = created.mode;
   runtime.setTrustReportingEnabled($("reportTrust").checked);
-  sessionId = await runtime.createSession();
+  sessionId = await resolveSessionId(runtime);
   setStatus(
     `已切换 provider=${provider} mode=${mode} session=${sessionId.slice(0, 8)}…`,
   );
   await refreshCapabilities();
   await refreshMemory();
+}
+
+async function startNewSession() {
+  if (!runtime) {
+    setStatus("请先注册设备");
+    return;
+  }
+  sessionId = await runtime.createSession();
+  $("log").innerHTML = "";
+  pendingImages = [];
+  renderImagePreview();
+  setStatus(`新会话 session=${sessionId.slice(0, 8)}…`);
 }
 
 $("provider").onchange = () => void recreateRuntimeIfRegistered();
@@ -443,9 +471,9 @@ $("provider").onchange = () => void recreateRuntimeIfRegistered();
     runtime = created.runtime;
     mode = created.mode;
     runtime.setTrustReportingEnabled($("reportTrust").checked);
-    sessionId = await runtime.createSession();
+    sessionId = await resolveSessionId(runtime);
     setStatus(
-      `已恢复 device=${deviceId.slice(0, 8)}… provider=${provider} mode=${mode}（可重新注册）`,
+      `已恢复 device=${deviceId.slice(0, 8)}… provider=${provider} mode=${mode} session=${sessionId.slice(0, 8)}…（可重新注册 / 新会话）`,
     );
     await refreshCapabilities();
     await refreshMemory();

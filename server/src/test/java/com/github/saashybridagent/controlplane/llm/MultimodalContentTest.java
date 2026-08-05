@@ -58,21 +58,67 @@ class MultimodalContentTest {
   }
 
   @Test
-  void rejectsSixImages() {
+  void dropsOldestWhenSixHistoricalImages() {
     List<ChatMessageDto> messages = new ArrayList<>();
+    List<String> urls = new ArrayList<>();
     for (int i = 0; i < 6; i++) {
+      String url =
+          "data:image/png;base64,"
+              + Base64.getEncoder().encodeToString(("img" + i).getBytes());
+      urls.add(url);
       ArrayNode parts = om.createArrayNode();
-      parts
-          .addObject()
-          .put("type", "image_url")
-          .putObject("image_url")
-          .put("url", "data:image/png;base64,aaaa");
+      parts.addObject().put("type", "image_url").putObject("image_url").put("url", url);
       messages.add(new ChatMessageDto("user", parts, null, null, null));
     }
-    assertThatThrownBy(() -> MultimodalContent.validate(messages, "gpt-4o-mini"))
+    MultimodalContent.validate(messages, "gpt-4o-mini");
+    assertThat(MultimodalContent.countImages(messages)).isEqualTo(5);
+    assertThat(messages.get(0).content().size()).isEqualTo(0);
+    assertThat(messages.get(1).content().get(0).path("image_url").path("url").asText())
+        .isEqualTo(urls.get(1));
+  }
+
+  @Test
+  void rejectsHttpsImageUrl() {
+    ArrayNode parts = om.createArrayNode();
+    parts
+        .addObject()
+        .put("type", "image_url")
+        .putObject("image_url")
+        .put("url", "https://example.com/a.png");
+    ChatMessageDto msg = new ChatMessageDto("user", parts, null, null, null);
+    assertThatThrownBy(() -> MultimodalContent.validate(List.of(msg), "gpt-4o-mini"))
         .isInstanceOf(MultimodalValidationException.class)
         .extracting(ex -> ((MultimodalValidationException) ex).getCode())
-        .isEqualTo("image_limit");
+        .isEqualTo("image_unsupported");
+  }
+
+  @Test
+  void rejectsHttpImageUrl() {
+    ArrayNode parts = om.createArrayNode();
+    parts
+        .addObject()
+        .put("type", "image_url")
+        .putObject("image_url")
+        .put("url", "http://example.com/a.png");
+    ChatMessageDto msg = new ChatMessageDto("user", parts, null, null, null);
+    assertThatThrownBy(() -> MultimodalContent.validate(List.of(msg), "gpt-4o-mini"))
+        .isInstanceOf(MultimodalValidationException.class)
+        .extracting(ex -> ((MultimodalValidationException) ex).getCode())
+        .isEqualTo("image_unsupported");
+  }
+
+  @Test
+  void toUserMessageThrowsOnHttpsInsteadOfSoftSkip() {
+    ArrayNode parts = om.createArrayNode();
+    parts
+        .addObject()
+        .put("type", "image_url")
+        .putObject("image_url")
+        .put("url", "https://example.com/a.png");
+    assertThatThrownBy(() -> MultimodalContent.toUserMessage(parts))
+        .isInstanceOf(MultimodalValidationException.class)
+        .extracting(ex -> ((MultimodalValidationException) ex).getCode())
+        .isEqualTo("image_unsupported");
   }
 
   @Test

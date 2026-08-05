@@ -1,6 +1,7 @@
 package com.github.saashybridagent.controlplane.llm;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.Base64;
 
@@ -39,7 +40,7 @@ class LlmGatewayMultimodalMappingTest {
   }
 
   @Test
-  void buildsUserMessageWithMediaFromHttpsUrl() {
+  void rejectsHttpsUrlInToUserMessage() {
     ArrayNode parts = om.createArrayNode();
     parts.addObject().put("type", "text").put("text", "describe");
     parts
@@ -48,11 +49,10 @@ class LlmGatewayMultimodalMappingTest {
         .putObject("image_url")
         .put("url", "https://example.com/cat.png");
 
-    UserMessage msg = MultimodalContent.toUserMessage(parts);
-
-    assertThat(msg.getText()).isEqualTo("describe");
-    assertThat(msg.getMedia()).hasSize(1);
-    assertThat(msg.getMedia().get(0).getData().toString()).contains("https://example.com/cat.png");
+    assertThatThrownBy(() -> MultimodalContent.toUserMessage(parts))
+        .isInstanceOf(MultimodalValidationException.class)
+        .extracting(ex -> ((MultimodalValidationException) ex).getCode())
+        .isEqualTo("image_unsupported");
   }
 
   @Test
