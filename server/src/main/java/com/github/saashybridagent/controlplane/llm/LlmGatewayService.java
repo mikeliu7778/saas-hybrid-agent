@@ -13,7 +13,6 @@ import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.ToolResponseMessage;
-import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.metadata.Usage;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
@@ -290,7 +289,7 @@ public class LlmGatewayService {
                       dto.toolCallId() == null ? "" : dto.toolCallId(),
                       dto.name() == null ? "" : dto.name(),
                       MultimodalContent.asPlainText(dto.content()))));
-      default -> new UserMessage(MultimodalContent.asPlainText(dto.content()));
+      default -> MultimodalContent.toUserMessage(dto.content());
     };
   }
 

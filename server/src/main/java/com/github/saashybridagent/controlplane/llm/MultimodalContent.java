@@ -1,5 +1,6 @@
 package com.github.saashybridagent.controlplane.llm;
 
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.LinkedHashMap;
@@ -8,6 +9,11 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import org.springframework.ai.chat.messages.UserMessage;
+import org.springframework.ai.content.Media;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.util.MimeTypeUtils;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.github.saashybridagent.controlplane.dto.ChatMessageDto;
@@ -95,6 +101,55 @@ public final class MultimodalContent {
       return sb.toString();
     }
     return "";
+  }
+
+  public static UserMessage toUserMessage(JsonNode content) {
+    if (content == null || content.isNull()) {
+      return new UserMessage("");
+    }
+    if (content.isTextual()) {
+      return new UserMessage(content.asText());
+    }
+    if (!content.isArray()) {
+      return new UserMessage("");
+    }
+    StringBuilder text = new StringBuilder();
+    List<Media> media = new ArrayList<>();
+    for (JsonNode part : content) {
+      if (part == null || !part.isObject()) {
+        continue;
+      }
+      String type = part.path("type").asText();
+      if ("text".equals(type)) {
+        text.append(part.path("text").asText(""));
+      } else if ("image_url".equals(type)) {
+        String url = part.path("image_url").path("url").asText(null);
+        Media image = toMedia(url);
+        if (image != null) {
+          media.add(image);
+        }
+      }
+    }
+    return UserMessage.builder().text(text.toString()).media(media).build();
+  }
+
+  private static Media toMedia(String url) {
+    if (url == null || url.isBlank()) {
+      return null;
+    }
+    if (url.startsWith("http://") || url.startsWith("https://")) {
+      return new Media(MimeTypeUtils.IMAGE_PNG, URI.create(url));
+    }
+    Matcher matcher = DATA_URI.matcher(url);
+    if (!matcher.matches()) {
+      return null;
+    }
+    String mime = matcher.group(1);
+    if ("image/jpg".equals(mime)) {
+      mime = "image/jpeg";
+    }
+    byte[] bytes = Base64.getDecoder().decode(matcher.group(3));
+    return new Media(MimeTypeUtils.parseMimeType(mime), new ByteArrayResource(bytes));
   }
 
   public static List<Map<String, Object>> normalizedParts(JsonNode content) {
