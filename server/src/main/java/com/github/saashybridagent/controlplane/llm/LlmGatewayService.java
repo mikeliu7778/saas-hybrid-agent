@@ -22,6 +22,7 @@ import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.model.tool.ToolCallingChatOptions;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.definition.DefaultToolDefinition;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -44,6 +45,7 @@ public class LlmGatewayService {
   private final ObjectMapper objectMapper;
   private final SaasHybridAgentProperties properties;
   private final CursorSidecarClient cursorSidecarClient;
+  private final String defaultModel;
   private final AtomicLong globalCursor = new AtomicLong(0);
   private final ExecutorService streamExecutor = Executors.newCachedThreadPool();
 
@@ -53,16 +55,20 @@ public class LlmGatewayService {
       RateLimiter rateLimiter,
       ObjectMapper objectMapper,
       SaasHybridAgentProperties properties,
-      CursorSidecarClient cursorSidecarClient) {
+      CursorSidecarClient cursorSidecarClient,
+      @Value("${spring.ai.openai.chat.options.model:gpt-4o-mini}") String defaultModel) {
     this.chatModel = chatModel;
     this.quotaService = quotaService;
     this.rateLimiter = rateLimiter;
     this.objectMapper = objectMapper;
     this.properties = properties;
     this.cursorSidecarClient = cursorSidecarClient;
+    this.defaultModel = defaultModel;
   }
 
   public Map<String, Object> complete(LlmChatRequest request, String userId) {
+    String effectiveModel = request.model() != null ? request.model() : defaultModel;
+    MultimodalContent.validate(request.messages(), effectiveModel);
     ensureAllowed(userId);
     if (isCursor(effectiveProvider(request))) {
       Map<String, Object> body = cursorSidecarClient.complete(request);
@@ -78,6 +84,8 @@ public class LlmGatewayService {
   }
 
   public SseEmitter stream(LlmChatRequest request, String userId) {
+    String effectiveModel = request.model() != null ? request.model() : defaultModel;
+    MultimodalContent.validate(request.messages(), effectiveModel);
     ensureAllowed(userId);
     SseEmitter emitter = new SseEmitter(0L);
     AtomicLong seq = new AtomicLong(parseCursor(request.cursor()));
