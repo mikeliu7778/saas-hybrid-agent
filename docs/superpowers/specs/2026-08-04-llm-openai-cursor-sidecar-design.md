@@ -1,7 +1,7 @@
 # LLM OpenAI + Cursor Sidecar 兼容设计
 
 - 日期：2026-08-04
-- 状态：已确认（待实现计划）
+- 状态：已实现（待验收）
 - 关联：
   - [2026-08-03-saas-hybrid-agent-design.md](./2026-08-03-saas-hybrid-agent-design.md)
   - 参考实现：`/Users/liubing/work/feedForge/wp_niche/ai.py`（`CursorProvider` + `Agent.prompt`）

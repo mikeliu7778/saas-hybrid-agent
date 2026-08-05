@@ -20,13 +20,25 @@ cd client-agent && npm test
 
 ## Run locally
 
+一键启动 sidecar（可选）+ Java 控制面 + Web demo：
+
+```bash
+./scripts/dev.sh
+```
+
+- Sidecar：`http://127.0.0.1:8091/health`（可用 `SKIP_CURSOR_SIDECAR=1` 跳过）
+- 控制面：`http://localhost:8080/v1/health`
+- Web demo：`http://localhost:5173/web/`
+
+仅启动控制面：
+
 ```bash
 ./mvnw -pl server spring-boot:run
 ```
 
-API 默认监听 `http://localhost:8080`。
-
 ## Trust Demo Web UI
+
+`./scripts/dev.sh` 会同时拉起 demo；也可手动分终端：
 
 ```bash
 # terminal 1 — control plane
@@ -36,17 +48,26 @@ API 默认监听 `http://localhost:8080`。
 cd client-agent && npm run demo:web
 ```
 
-浏览器打开 `http://localhost:5173/web/`：注册设备 → 发消息 → 👍/👎 → Memory 删除；勾选「上报采信」后可查 `GET /v1/trust/metrics`。
+浏览器打开 `http://localhost:5173/web/`：注册设备 → 发消息 → 👍/👎 → Memory 删除；勾选「上报采信」后可查 `GET /v1/trust/metrics`。Web 下拉可选 LLM **provider**（`openai` / `cursor`）。
 
 手动验收：发「我喜欢简体中文」→ Memory 出现 preference → 👎 或删除 Memory → 列表更新。
 
 ## Environment variables
 
-| Variable | Description |
-|----------|-------------|
-| `SAAS_HYBRID_AGENT_API_KEY` | OpenAI-compatible API key（控制面 LLM/embeddings 上游） |
-| `SAAS_HYBRID_AGENT_BASE_URL` | Chat Completions base URL (default: `https://api.openai.com`) |
-| `SAAS_HYBRID_AGENT_MODEL` | Model name (default: `gpt-4o-mini`) |
+| Variable | Read by | Description |
+|----------|---------|-------------|
+| `SAAS_HYBRID_AGENT_API_KEY` | Java | OpenAI-compatible API key（`provider=openai` 路径） |
+| `SAAS_HYBRID_AGENT_BASE_URL` | Java | Chat Completions base URL (default: `https://api.openai.com`) |
+| `SAAS_HYBRID_AGENT_MODEL` | Java | Model name (default: `gpt-4o-mini`) |
+| `SAAS_HYBRID_AGENT_LLM_PROVIDER` | Java | 默认 LLM provider：`openai` \| `cursor`（default: `openai`） |
+| `CURSOR_SIDECAR_URL` | Java | Python sidecar 基址 (default: `http://127.0.0.1:8091`) |
+| `CURSOR_API_KEY` | **sidecar only** | Cursor 密钥（`crsr_…`）；**不要**填入 `SAAS_HYBRID_AGENT_API_KEY` |
+| `CURSOR_MODEL` | sidecar | Cursor 模型 (default: `composer-2.5`) |
+| `CURSOR_AGENT_CWD` | sidecar | Local Agent 工作目录 |
+| `SKIP_CURSOR_SIDECAR` | `dev.sh` | 设为 `1` 时不启动 python-sidecar |
+| `SIDECAR_PORT` | `dev.sh` / sidecar | Sidecar 端口 (default: `8091`) |
+
+`POST /v1/llm/chat` 请求体可选 `provider` 覆盖默认值。`provider=cursor` 时 Java 转发至本机 sidecar；**忽略**请求中的 `tools`，响应 **不含** LLM `tool_calls`——端上 Hybrid 工具环需 `provider=openai`。
 
 ## Phase A control plane
 
@@ -85,6 +106,7 @@ OpenAPI: `client-agent/schemas/openapi-phase-a.yaml`
 - PRD: `docs/superpowers/specs/2026-07-27-client-agent-runtime-prd.md`
 - Design: `docs/superpowers/specs/2026-08-03-saas-hybrid-agent-design.md`
 - Trust flywheel: `docs/superpowers/specs/2026-08-04-trust-signal-data-flywheel-design.md`
+- LLM Cursor sidecar: `docs/superpowers/specs/2026-08-04-llm-openai-cursor-sidecar-design.md`
 
 ## Non-goals（后置）
 

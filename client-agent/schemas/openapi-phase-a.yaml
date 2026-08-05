@@ -45,7 +45,7 @@ paths:
   /v1/llm/chat:
     post:
       operationId: llmChat
-      summary: Proxy OpenAI-compatible chat completions (SSE)
+      summary: Chat completions via OpenAI-compatible upstream or Cursor sidecar (SSE)
       security:
         - bearerAuth: []
       requestBody:
@@ -230,6 +230,13 @@ components:
       type: object
       required: [messages]
       properties:
+        provider:
+          type: string
+          enum: [openai, cursor]
+          description: |
+            LLM backend. Defaults to server `saas-hybrid-agent.llm.default-provider` (openai).
+            When `cursor`, Java forwards to the local Python sidecar; request `tools` are ignored
+            and responses do not include LLM `tool_call` events (client Hybrid tool loop requires openai).
         model:
           type: string
         messages:
