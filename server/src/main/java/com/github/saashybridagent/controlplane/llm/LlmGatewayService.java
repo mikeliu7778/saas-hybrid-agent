@@ -273,7 +273,7 @@ public class LlmGatewayService {
   private Message toSpringMessage(ChatMessageDto dto) {
     String role = dto.role() == null ? "user" : dto.role();
     return switch (role) {
-      case "system" -> new SystemMessage(dto.content() == null ? "" : dto.content());
+      case "system" -> new SystemMessage(MultimodalContent.asPlainText(dto.content()));
       case "assistant" -> toAssistant(dto);
       case "tool" ->
           new ToolResponseMessage(
@@ -281,8 +281,8 @@ public class LlmGatewayService {
                   new ToolResponseMessage.ToolResponse(
                       dto.toolCallId() == null ? "" : dto.toolCallId(),
                       dto.name() == null ? "" : dto.name(),
-                      dto.content() == null ? "" : dto.content())));
-      default -> new UserMessage(dto.content() == null ? "" : dto.content());
+                      MultimodalContent.asPlainText(dto.content()))));
+      default -> new UserMessage(MultimodalContent.asPlainText(dto.content()));
     };
   }
 
@@ -299,7 +299,8 @@ public class LlmGatewayService {
         toolCalls.add(new AssistantMessage.ToolCall(id, "function", name, arguments));
       }
     }
-    return new AssistantMessage(dto.content() == null ? "" : dto.content(), Map.of(), toolCalls);
+    return new AssistantMessage(
+        MultimodalContent.asPlainText(dto.content()), Map.of(), toolCalls);
   }
 
   private static Map<String, Object> toJsonResponse(ChatResponse response) {
