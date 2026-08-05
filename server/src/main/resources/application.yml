@@ -10,6 +10,9 @@ spring:
           model: ${SAAS_HYBRID_AGENT_MODEL:gpt-4o-mini}
 
 saas-hybrid-agent:
+  llm:
+    default-provider: ${SAAS_HYBRID_AGENT_LLM_PROVIDER:openai}
+    cursor-sidecar-url: ${CURSOR_SIDECAR_URL:http://127.0.0.1:8091}
   control-plane:
     quota:
       llm-tokens-limit: 1000000

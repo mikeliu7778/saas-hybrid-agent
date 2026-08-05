@@ -10,6 +10,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record LlmChatRequest(
     String model,
+    String provider,
     @NotEmpty List<ChatMessageDto> messages,
     List<Map<String, Object>> tools,
     Boolean stream,

@@ -6,9 +6,14 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public class SaasHybridAgentProperties {
 
   private final ControlPlane controlPlane = new ControlPlane();
+  private final Llm llm = new Llm();
 
   public ControlPlane getControlPlane() {
     return controlPlane;
+  }
+
+  public Llm getLlm() {
+    return llm;
   }
 
   public static class ControlPlane {
@@ -54,6 +59,27 @@ public class SaasHybridAgentProperties {
 
     public void setChatRequestsPerWindow(int chatRequestsPerWindow) {
       this.chatRequestsPerWindow = chatRequestsPerWindow;
+    }
+  }
+
+  public static class Llm {
+    private String defaultProvider = "openai";
+    private String cursorSidecarUrl = "http://127.0.0.1:8091";
+
+    public String getDefaultProvider() {
+      return defaultProvider;
+    }
+
+    public void setDefaultProvider(String defaultProvider) {
+      this.defaultProvider = defaultProvider;
+    }
+
+    public String getCursorSidecarUrl() {
+      return cursorSidecarUrl;
+    }
+
+    public void setCursorSidecarUrl(String cursorSidecarUrl) {
+      this.cursorSidecarUrl = cursorSidecarUrl;
     }
   }
 }
