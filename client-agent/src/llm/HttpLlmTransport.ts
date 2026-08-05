@@ -122,7 +122,15 @@ export class HttpLlmTransport implements LlmTransport {
         finishReason =
           typeof event.data.finish_reason === "string" ? event.data.finish_reason : "stop";
       } else if (type === "error") {
-        throw new Error(String(event.data.error ?? "LLM stream error"));
+        const message =
+          typeof event.data.message === "string"
+            ? event.data.message
+            : typeof event.data.code === "string"
+              ? event.data.code
+              : typeof event.data.error === "string"
+                ? event.data.error
+                : "LLM stream error";
+        throw new Error(message);
       }
     }
 

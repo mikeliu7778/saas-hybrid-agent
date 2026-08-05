@@ -92,6 +92,7 @@ else
 fi
 
 echo "Starting backend on :${BACKEND_PORT} …"
+export CURSOR_SIDECAR_URL="http://127.0.0.1:${SIDECAR_PORT}"
 (
   cd "${ROOT}"
   ./mvnw -pl server spring-boot:run

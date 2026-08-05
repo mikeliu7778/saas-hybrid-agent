@@ -7,7 +7,7 @@ from typing import Any
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 
-from cursor_runner import CursorRunError, CursorSdkRunner
+from cursor_runner import CursorRunError, CursorSdkRunner, is_auth_error
 
 
 def messages_to_prompt(messages: list[dict[str, Any]]) -> str:
@@ -47,14 +47,11 @@ def create_app(runner: CursorSdkRunner | Any | None = None) -> FastAPI:
         try:
             content = runner.run_complete(prompt, model, cwd)
         except CursorRunError as exc:
-            return JSONResponse(
-                status_code=502,
-                content={
-                    "type": "error",
-                    "code": exc.code,
-                    "message": str(exc),
-                },
-            )
+            return _error_response(exc)
+        except Exception as exc:
+            if is_auth_error(exc):
+                return _error_response(exc, code="cursor_unauthorized")
+            raise
 
         return {
             "content": content,
@@ -63,6 +60,21 @@ def create_app(runner: CursorSdkRunner | Any | None = None) -> FastAPI:
         }
 
     return app
+
+
+def _error_response(exc: BaseException, code: str | None = None) -> JSONResponse:
+    if isinstance(exc, CursorRunError):
+        error_code = exc.code
+    else:
+        error_code = code or "cursor_error"
+    return JSONResponse(
+        status_code=502,
+        content={
+            "type": "error",
+            "code": error_code,
+            "message": str(exc),
+        },
+    )
 
 
 def _sse_events(
@@ -78,6 +90,18 @@ def _sse_events(
             {"type": "error", "code": exc.code, "message": str(exc)}
         )
         yield f"data: {payload}\n\n"
+    except Exception as exc:
+        if is_auth_error(exc):
+            payload = json.dumps(
+                {
+                    "type": "error",
+                    "code": "cursor_unauthorized",
+                    "message": str(exc),
+                }
+            )
+            yield f"data: {payload}\n\n"
+        else:
+            raise
 
 
 app = create_app()

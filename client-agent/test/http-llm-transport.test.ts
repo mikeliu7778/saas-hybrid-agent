@@ -170,6 +170,24 @@ describe("HttpLlmTransport (real LLM gateway)", () => {
     expect(body.provider).toBe("cursor");
   });
 
+  it("stream throws error event message when present", async () => {
+    const sse = [
+      'data:{"type":"error","code":"cursor_unauthorized","message":"invalid api key"}',
+      "",
+      "",
+    ].join("\n");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(sse, { status: 200, headers: { "content-type": "text/event-stream" } }),
+      ),
+    );
+    const llm = new HttpLlmTransport({ baseUrl: "http://gw", token: "t" });
+    await expect(
+      llm.stream([{ role: "user", content: "hi" }], [], () => {}),
+    ).rejects.toThrow("invalid api key");
+  });
+
   it("throws on 401", async () => {
     vi.stubGlobal(
       "fetch",
