@@ -1,8 +1,71 @@
-# SaaS Hybrid
+# SaaS Hybrid Agent
 
-SaaS Hybrid **薄控制面**：设备鉴权、LLM 代理、Sync、Quota。Agent 循环与工具在端上 `client-agent` 执行。
+**On-device agent loop + thin cloud control plane** for personal assistants at scale.
 
-私有化「服务端跑 Agent」已迁至姊妹项目 [`java-agent-runtime`](../../java-agent-runtime)（`/v1/sessions/**`、工具与 SQLite）。
+The conversation loop, tools, and Memory run on the client (`client-agent`). The cloud only handles device auth, LLM proxying, Sync, quota, and trust-signal metrics — not a centralized vector index or server-side tool loop.
+
+## Why this shape
+
+For large-scale personal agents, three constraints rule out “one Pod per user” and a central ANN:
+
+1. **Cost** — central embeddings/ANN grow linearly with users.
+2. **Context** — tools and Memory need device-local state (files, clipboard, photos).
+3. **Continuity** — multi-device continuity needs Sync of messages/Memory, not a shared cloud semantic index.
+
+**Product stance:** client owns the agent; cloud is a thin control plane. Sync stores **platform-readable** message and Memory replicas by default (optional E2E encryption is deferred). Trust signals improve on-device Memory and feed platform metrics — not a cross-user RAG corpus in Phase A.
+
+## Architecture
+
+```text
+[Web / client]
+  client-agent
+    ConversationLoop · Tools · Memory · TrustSignalCollector
+        │  LLM SSE / embeddings / sync / quota / trust events
+        ▼
+[saas-hybrid-agent server]   Control plane only
+  /v1/devices  /v1/llm/*  /v1/sync/*  /v1/quota  /v1/trust/*
+
+  provider=openai  → OpenAI-compatible Chat Completions
+  provider=cursor  → local Python sidecar (Cursor SDK, streaming text)
+
+[Self-hosted ops] ──HTTP /v1/sessions──► [java-agent-runtime]
+  AgentRuntime + tools + SQLite (separate product)
+```
+
+| Layer | Responsibility |
+|-------|----------------|
+| `client-agent` | ConversationLoop, ToolHost, local Memory (semantic + episode), Sync client, trust apply + event queue |
+| `server` | Device bearer auth, rate limits / quota, LLM gateway, Sync store, trust event append + metrics |
+| `python-sidecar` | Holds `CURSOR_API_KEY`; streams Cursor Local Agent text into the same SSE shape |
+
+## What's in Phase A (now)
+
+- **Device register / revoke** and bearer-auth control-plane APIs
+- **LLM gateway** — `POST /v1/llm/chat` (SSE or JSON), embeddings, static vision capabilities
+- **Provider switch** — `openai` (tool-calling path) or `cursor` (sidecar text stream; request `tools` ignored)
+- **Multimodal vision** — OpenAI-style content parts (`text` + `image_url` data URI); client + server gate non-vision models
+- **Sync** — push/pull messages + Memory (plaintext / platform-readable)
+- **Trust flywheel** — on-device `applyTrust`; `POST /v1/trust/events` + `GET /v1/trust/metrics`
+- **Web demo** — register device, chat, thumbs, Memory edit/delete, provider picker, image attach
+
+## Roadmap
+
+| Phase | Focus |
+|-------|--------|
+| **A** (current) | Web-first closed loop: TS runtime, LlmGateway, local Memory retrieval, Sync, sandbox file + HTTP tools, trust signals, vision |
+| **B** | iOS / Android same-protocol runtime; on-device embeddings; procedural Memory; optional E2E Sync |
+| **C** | Large workspace chunking; optional Dev Companion remote terminal; on-device small models for extract / rerank |
+
+**Explicitly deferred:** multi-tenant billing console / admin UI; same-session hybrid tool execution (some tools on cloud workers); central cross-user vector search / public RAG; Cursor Cloud Agent / `/v1/agents/**`; mapping Cursor internal tools to control-plane `tool_calls`.
+
+## Modules
+
+| Path | Role |
+|------|------|
+| `server/` | Spring Boot control plane |
+| `client-agent/` | TypeScript on-device runtime + Trust Demo Web UI |
+| `python-sidecar/` | Optional Cursor Local Agent sidecar |
+| `docs/superpowers/specs/` | PRD and design docs |
 
 ## Build
 
@@ -18,27 +81,31 @@ cd client-agent && npm test
 ./mvnw -pl server -am package -DskipTests
 ```
 
+```bash
+cd python-sidecar && pytest   # optional; needs sidecar deps
+```
+
 ## Run locally
 
-一键启动 sidecar（可选）+ Java 控制面 + Web demo：
+One-shot: sidecar (optional) + Java control plane + Web demo:
 
 ```bash
 ./scripts/dev.sh
 ```
 
-- Sidecar：`http://127.0.0.1:8091/health`（可用 `SKIP_CURSOR_SIDECAR=1` 跳过）
-- 控制面：`http://localhost:8080/v1/health`
-- Web demo：`http://localhost:5173/web/`
+| Service | URL |
+|---------|-----|
+| Sidecar health | `http://127.0.0.1:8091/health` (`SKIP_CURSOR_SIDECAR=1` to skip) |
+| Control plane | `http://localhost:8080/v1/health` |
+| Web demo | `http://localhost:5173/web/` |
 
-仅启动控制面：
+Control plane only:
 
 ```bash
 ./mvnw -pl server spring-boot:run
 ```
 
-## Trust Demo Web UI
-
-`./scripts/dev.sh` 会同时拉起 demo；也可手动分终端：
+Demo in two terminals:
 
 ```bash
 # terminal 1 — control plane
@@ -48,42 +115,42 @@ cd client-agent && npm test
 cd client-agent && npm run demo:web
 ```
 
-浏览器打开 `http://localhost:5173/web/`：注册设备 → 发消息 → 👍/👎 → Memory 删除；勾选「上报采信」后可查 `GET /v1/trust/metrics`。Web 下拉可选 LLM **provider**（`openai` / `cursor`）。
+Open `http://localhost:5173/web/`: register a device → send messages → 👍/👎 → delete Memory. With trust reporting enabled, inspect `GET /v1/trust/metrics`. The provider dropdown selects `openai` or `cursor`. Attach images when the model reports vision via `GET /v1/llm/capabilities`.
 
-手动验收：发「我喜欢简体中文」→ Memory 出现 preference → 👎 或删除 Memory → 列表更新。
+**Smoke check:** send “I prefer Simplified Chinese” → preference appears in Memory → 👎 or delete Memory → list updates.
 
 ## Environment variables
 
 | Variable | Read by | Description |
 |----------|---------|-------------|
-| `SAAS_HYBRID_AGENT_API_KEY` | Java | OpenAI-compatible API key（`provider=openai` 路径） |
+| `SAAS_HYBRID_AGENT_API_KEY` | Java | OpenAI-compatible API key (`provider=openai`) |
 | `SAAS_HYBRID_AGENT_BASE_URL` | Java | Chat Completions base URL (default: `https://api.openai.com`) |
 | `SAAS_HYBRID_AGENT_MODEL` | Java | Model name (default: `gpt-4o-mini`) |
-| `SAAS_HYBRID_AGENT_LLM_PROVIDER` | Java | 默认 LLM provider：`openai` \| `cursor`（default: `openai`） |
-| `CURSOR_SIDECAR_URL` | Java | Python sidecar 基址 (default: `http://127.0.0.1:8091`) |
-| `CURSOR_API_KEY` | **sidecar only** | Cursor 密钥（`crsr_…`）；**不要**填入 `SAAS_HYBRID_AGENT_API_KEY` |
-| `CURSOR_MODEL` | sidecar | Cursor 模型 (default: `composer-2.5`) |
-| `CURSOR_AGENT_CWD` | sidecar | Local Agent 工作目录 |
-| `SKIP_CURSOR_SIDECAR` | `dev.sh` | 设为 `1` 时不启动 python-sidecar |
-| `SIDECAR_PORT` | `dev.sh` / sidecar | Sidecar 端口 (default: `8091`) |
+| `SAAS_HYBRID_AGENT_LLM_PROVIDER` | Java | Default provider: `openai` \| `cursor` (default: `openai`) |
+| `CURSOR_SIDECAR_URL` | Java | Python sidecar base URL (default: `http://127.0.0.1:8091`) |
+| `CURSOR_API_KEY` | **sidecar only** | Cursor key (`crsr_…`); **do not** put this in `SAAS_HYBRID_AGENT_API_KEY` |
+| `CURSOR_MODEL` | sidecar | Cursor model (default: `composer-2.5`) |
+| `CURSOR_AGENT_CWD` | sidecar | Local Agent working directory |
+| `SKIP_CURSOR_SIDECAR` | `dev.sh` | Set to `1` to skip starting the sidecar |
+| `SIDECAR_PORT` | `dev.sh` / sidecar | Sidecar port (default: `8091`) |
 
-`POST /v1/llm/chat` 请求体可选 `provider` 覆盖默认值。`provider=cursor` 时 Java 转发至本机 sidecar；**忽略**请求中的 `tools`，响应 **不含** LLM `tool_calls`——端上 Hybrid 工具环需 `provider=openai`。
+`POST /v1/llm/chat` may set `provider` per request. With `provider=cursor`, Java forwards to the local sidecar, **ignores** request `tools`, and responses **do not** include LLM `tool_calls` — the on-device Hybrid tool loop needs `provider=openai`.
 
-**Multimodal（vision）：** 用户消息可传 OpenAI 风格 content parts（`text` + `image_url` data URI）。无 vision 的模型（如 `gpt-3.5-turbo`）会在端上禁用选图，且服务端返回 `400`（`model_lacks_vision`）。默认 `gpt-4o-mini` 支持 vision；发图前可调用 `GET /v1/llm/capabilities` 查询。
+**Vision:** user messages may use OpenAI-style content parts (`text` + `image_url` data URI). Non-vision models (e.g. `gpt-3.5-turbo`) disable image pick on the client and return `400` (`model_lacks_vision`) on the server. Default `gpt-4o-mini` supports vision; call `GET /v1/llm/capabilities` before attaching images.
 
-## Phase A control plane
+## Control plane API (Phase A)
 
 | Path | Auth | Notes |
 |------|------|-------|
 | `POST /v1/devices` | none | Register device → `{ deviceId, token, userId }` |
 | `DELETE /v1/devices/{id}` | bearer | Revoke device token |
-| `POST /v1/llm/chat` | bearer | SSE (default) or JSON (`stream: false`); `content` may be string or `[{ type, text?, image_url? }]` parts (user role only for images) |
-| `GET /v1/llm/capabilities?model=&provider=` | bearer | `{ vision, model, provider? }` — static vision table; client gates image attach before send |
-| `POST /v1/llm/embeddings` | bearer | Returns `{ model, data: [{ embedding, index }] }` |
+| `POST /v1/llm/chat` | bearer | SSE (default) or JSON (`stream: false`); `content` may be string or `[{ type, text?, image_url? }]` (images: user role only) |
+| `GET /v1/llm/capabilities?model=&provider=` | bearer | `{ vision, model, provider? }` — static vision table; client gates image attach |
+| `POST /v1/llm/embeddings` | bearer | `{ model, data: [{ embedding, index }] }` |
 | `POST /v1/sync/push` | bearer | Mutation upload (Phase A **plaintext**, not E2E) |
 | `GET /v1/sync/pull?since=cursor` | bearer | Monotonic cursor pull |
 | `GET /v1/quota` | bearer | Usage vs limits |
-| `POST /v1/trust/events` | bearer | Batch append trust signals; idempotent on `eventId` → `{ accepted, duplicates }` |
+| `POST /v1/trust/events` | bearer | Batch append; idempotent on `eventId` → `{ accepted, duplicates }` |
 | `GET /v1/trust/metrics?from=&to=&grain=day` | bearer | Per-day counts by signal and `kind` |
 | `GET /v1/health` | none | Health check |
 
@@ -97,20 +164,22 @@ saas-hybrid-agent:
       chat-requests-per-window: 1000
 ```
 
-OpenAPI: `client-agent/schemas/openapi-phase-a.yaml`
-
-## Modules
-
-- `server` — Spring Boot 控制面
-- `client-agent` — 端上 ConversationLoop / Tools / Memory（TypeScript）
+OpenAPI: [`client-agent/schemas/openapi-phase-a.yaml`](client-agent/schemas/openapi-phase-a.yaml)
 
 ## Docs
 
-- PRD: `docs/superpowers/specs/2026-07-27-client-agent-runtime-prd.md`
-- Design: `docs/superpowers/specs/2026-08-03-saas-hybrid-agent-design.md`
-- Trust flywheel: `docs/superpowers/specs/2026-08-04-trust-signal-data-flywheel-design.md`
-- LLM Cursor sidecar: `docs/superpowers/specs/2026-08-04-llm-openai-cursor-sidecar-design.md`
+| Doc | Topic |
+|-----|--------|
+| [Client Agent Runtime PRD](docs/superpowers/specs/2026-07-27-client-agent-runtime-prd.md) | Product goals, phases, user stories |
+| [SaaS Hybrid split design](docs/superpowers/specs/2026-08-03-saas-hybrid-agent-design.md) | Control plane vs private runtime boundary |
+| [Trust signal / data flywheel](docs/superpowers/specs/2026-08-04-trust-signal-data-flywheel-design.md) | On-device Memory trust + control-plane metrics |
+| [LLM OpenAI + Cursor sidecar](docs/superpowers/specs/2026-08-04-llm-openai-cursor-sidecar-design.md) | Provider routing and sidecar protocol |
+| [Multimodal vision](docs/superpowers/specs/2026-08-05-multimodal-vision-design.md) | Image parts, capabilities gate, provider paths |
 
-## Non-goals（后置）
+## Non-goals (deferred)
 
-多租户账号体系、计费后台、管理控制台；同一会话端云混合执行工具。
+- Multi-tenant account system, billing console, admin UI
+- Same-session hybrid execution (some tools on cloud workers)
+- Central cross-user semantic search / public RAG knowledge base
+- Default E2E Sync (optional later)
+- Cursor Cloud Agent and mapping Cursor tools to `tool_calls`
