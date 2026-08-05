@@ -2,14 +2,22 @@
 
 **On-device agent loop + thin cloud control plane** for personal assistants at scale.
 
-The conversation loop, tools, and Memory run on the client (`client-agent`). The cloud only handles device auth, LLM proxying, Sync, quota, and trust-signal metrics — not a centralized vector index or server-side tool loop.
+**Multi-device by design:** the same account keeps conversations and Memory in sync across Web, phone, and tablet — pick up on one device where you left off on another.
+
+**Low server footprint:** the agent loop, tools, and semantic retrieval run on the client. The cloud is only device auth, LLM proxying, Sync, quota, and trust metrics — no per-user agent Pod, no central vector index, no server-side tool loop. Server cost scales with Sync traffic and LLM gateway load, not with Memory index size or always-on runtimes.
 
 ## Why this shape
 
+| Goal | How Hybrid delivers it |
+|------|------------------------|
+| **Multi-device continuity** | Sync push/pull keeps messages and Memory consistent across devices on the same account |
+| **Low server footprint** | Control plane is auth + LLM gateway + Sync store + metrics — not AgentRuntime, not ANN, not tool execution |
+| **Device-local context** | Tools and Memory use on-device state (files, clipboard, photos) without a fat backend |
+
 For large-scale personal agents, three constraints rule out “one Pod per user” and a central ANN:
 
-1. **Cost** — central embeddings/ANN grow linearly with users.
-2. **Context** — tools and Memory need device-local state (files, clipboard, photos).
+1. **Cost** — central embeddings/ANN grow linearly with users; Hybrid keeps retrieval on-device so the server stays thin.
+2. **Context** — tools and Memory need device-local state.
 3. **Continuity** — multi-device continuity needs Sync of messages/Memory, not a shared cloud semantic index.
 
 **Product stance:** client owns the agent; cloud is a thin control plane. Sync stores **platform-readable** message and Memory replicas by default (optional E2E encryption is deferred). Trust signals improve on-device Memory and feed platform metrics — not a cross-user RAG corpus in Phase A.
@@ -35,7 +43,7 @@ For large-scale personal agents, three constraints rule out “one Pod per user�
 | Layer | Responsibility |
 |-------|----------------|
 | `client-agent` | ConversationLoop, ToolHost, local Memory (semantic + episode), Sync client, trust apply + event queue |
-| `server` | Device bearer auth, rate limits / quota, LLM gateway, Sync store, trust event append + metrics |
+| `server` | Thin control plane: device auth, rate limits / quota, LLM gateway, Sync store (multi-device), trust metrics — not agent runtime or ANN |
 | `python-sidecar` | Holds `CURSOR_API_KEY`; streams Cursor Local Agent text into the same SSE shape |
 
 ## What's in Phase A (now)
@@ -44,7 +52,7 @@ For large-scale personal agents, three constraints rule out “one Pod per user�
 - **LLM gateway** — `POST /v1/llm/chat` (SSE or JSON), embeddings, static vision capabilities
 - **Provider switch** — `openai` (tool-calling path) or `cursor` (sidecar text stream; request `tools` ignored)
 - **Multimodal vision** — OpenAI-style content parts (`text` + `image_url` data URI); client + server gate non-vision models
-- **Sync** — push/pull messages + Memory (plaintext / platform-readable)
+- **Sync** — push/pull messages + Memory across devices (plaintext / platform-readable; multi-device continuity)
 - **Trust flywheel** — on-device `applyTrust`; `POST /v1/trust/events` + `GET /v1/trust/metrics`
 - **Web demo** — register device, chat, thumbs, Memory edit/delete, provider picker, image attach
 
