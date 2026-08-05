@@ -256,6 +256,14 @@ function readFileAsDataUrl(file) {
  * @param {File[]} files
  */
 async function addImageFiles(files) {
+  if (!token) {
+    setStatus("请先注册设备后再添加图片");
+    return;
+  }
+  if (!vision) {
+    setStatus("当前模型不支持 vision，请更换模型后再添加图片");
+    return;
+  }
   for (const file of files) {
     if (pendingImages.length >= MAX_IMAGES) {
       setStatus(`最多附 ${MAX_IMAGES} 张图片`);
@@ -379,18 +387,18 @@ function handlePaste(ev) {
   if (!items) return;
   const files = [];
   for (const item of items) {
-    if (item.kind === "file" && item.type.startsWith("image/")) {
+    if (item.kind === "file" && IMAGE_MIME.has(item.type)) {
       const f = item.getAsFile();
       if (f) files.push(f);
     }
   }
   if (files.length === 0) return;
   ev.preventDefault();
+  ev.stopPropagation();
   void addImageFiles(files);
 }
 
 $("msg").addEventListener("paste", handlePaste);
-document.addEventListener("paste", handlePaste);
 
 $("msg").addEventListener("keydown", (ev) => {
   if (ev.key === "Enter") {
