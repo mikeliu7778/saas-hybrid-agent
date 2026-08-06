@@ -79,7 +79,7 @@ For large-scale personal agents, three constraints rule out “one Pod per user�
 | **I5** / **I5a** | Workspace content-hash chunking; on-device summary + lexical rerank |
 | **I5b-A** | Chunk Sync: manifest-only Sync + on-demand `ChunkBackend` pull |
 | **I5b-B** | Continue / Aider / OpenCode ingest adapters |
-| **I5b-C** | Dev Companion / remote terminal → ingest — deferred |
+| **I5b-C** | Dev Companion session → `dev_companion` ingest (no cloud shell) |
 | **I5b-D** | Real tiny models (onnx/wasm) — deferred |
 
 **Explicitly deferred / never:** multi-tenant billing console / admin UI; same-session hybrid tool execution (some tools on cloud workers); central cross-user vector search / public RAG; Cursor Cloud Agent / `/v1/agents/**`; mapping Cursor internal tools to control-plane `tool_calls`; cloud auto-rewrite of user Memory.

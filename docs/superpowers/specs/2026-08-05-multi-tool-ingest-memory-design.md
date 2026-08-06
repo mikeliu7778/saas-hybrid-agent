@@ -231,7 +231,8 @@ I0 协议与 Cursor 闭环（本期）
 | **I5a** | Workspace 内容哈希分块；端侧摘要/词法重排（无云） | PRD Phase C 前半 | P2 |
 | **I5b-A** | 分块 Sync（清单 + ChunkBackend 按需） | I5a | **已实现** |
 | **I5b-B** | Continue / Aider / OpenCode adapters | I0 schema | **已实现** |
-| **I5b-C/D** | Dev Companion；真小模型 | — | 后置 |
+| **I5b-C** | Dev Companion 会话 → ingest（无云端 shell） | I0 | **已实现** |
+| **I5b-D** | 真小模型 | — | 后置 |
 
 ### 11.2 I0 — 协议与 Cursor 闭环（本期）
 
@@ -291,7 +292,7 @@ I0 协议与 Cursor 闭环（本期）
 
 ### 11.7 I5 — 增强
 
-**状态：I5a 已实现；I5b-A / I5b-B 已实现；C/D 后置**
+**状态：I5a 已实现；I5b-A / I5b-B / I5b-C（ingest）已实现；D 后置**
 
 - **I5a**
   - Workspace 大文件：**内容哈希分块**（`WorkspaceChunkStore` / `chunkText`），支持按 hash 按需取块与 GC  
@@ -304,7 +305,7 @@ I0 协议与 Cursor 闭环（本期）
 |------|------|------|------|
 | **A** | **分块 Sync** | **已实现** | Sync 只推 `workspace_file` **hash 清单**（path / contentHash / chunkHashes）；chunk **正文**走独立 `ChunkBackend` 按需拉取。控制面不存大文件 body。 |
 | **B** | **更多 host adapter** | **已实现** | Continue / Aider / OpenCode → 同一 `ingest_event`；薄 Python adapter，不扩 Java。 |
-| **C** | **Dev Companion** | 后置 | 远程终端 / Dev Companion 会话走 ingest；产品面独立，不阻塞 A/B。 |
+| **C** | **Dev Companion** | **已实现（ingest 切片）** | 可选 Companion 终端会话 NDJSON → `dev_companion` ingest（`session_summary` / `file_touch` / `procedure_draft`）；**不**在云端执行 shell；完整绑定 UX（US-X01）仍可后置。 |
 | **D** | **真小模型** | 后置 | onnx/wasm 替换规则摘要与重排；模型选型与体积另开。 |
 
 **I5b-A 协议要点**
@@ -317,6 +318,13 @@ I0 协议与 Cursor 闭环（本期）
 
 - `source` 扩展：`continue` / `aider` / `opencode`  
 - 输出仍为 `session_summary` + `file_touch`；走现有 scrub / `applyIngest`  
+
+**I5b-C 要点**
+
+- `source = "dev_companion"`；会话 NDJSON（`user` / `cmd` / `stdout` / `file_touch`）  
+- Python：`adapt_companion_session_file`；TS：`DevCompanionSession.toIngestEvents()` → `applyIngest`  
+- ≥2 条 `cmd` 时额外写 `procedure_draft`（终端步骤记忆）  
+- **不做**：云端 shell、Companion 机器绑定 UI（PRD US-X01 完整体验可后置）  
 
 ### 11.8 明确不进 Roadmap（保持 No-Go）
 

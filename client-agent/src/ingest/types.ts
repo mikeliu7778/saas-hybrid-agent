@@ -8,6 +8,7 @@ export type IngestSource =
   | "continue"
   | "aider"
   | "opencode"
+  | "dev_companion"
   | "other";
 
 export type IngestKind =

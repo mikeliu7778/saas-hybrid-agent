@@ -13,6 +13,7 @@ ALLOWED_SOURCES = frozenset(
         "continue",
         "aider",
         "opencode",
+        "dev_companion",
         "other",
     }
 )

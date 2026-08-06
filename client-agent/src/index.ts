@@ -49,6 +49,10 @@ export type {
 } from "./workspace/chunks.js";
 export { InMemoryChunkBackend } from "./sync/chunkBackend.js";
 export type { ChunkBackend } from "./sync/chunkBackend.js";
+export {
+  DevCompanionSession,
+} from "./companion/DevCompanionSession.js";
+export type { CompanionRecord } from "./companion/DevCompanionSession.js";
 export { fetchLlmCapabilities } from "./llm/HttpLlmCapabilities.js";
 export type {
   FetchLlmCapabilitiesOptions,
