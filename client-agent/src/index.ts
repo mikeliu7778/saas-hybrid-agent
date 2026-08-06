@@ -76,6 +76,17 @@ export type {
 export { HttpEmbeddingClient } from "./llm/HttpEmbeddingClient.js";
 export { InMemorySyncBackend } from "./sync/InMemorySyncBackend.js";
 export { LocalSyncEngine } from "./sync/LocalSyncEngine.js";
+export { HttpSyncBackend } from "./sync/HttpSyncBackend.js";
+export { MobileMemoryClient } from "./sync/MobileMemoryClient.js";
+export {
+  AesGcmSyncCrypto,
+  plaintextSyncCrypto,
+  isE2ePayload,
+} from "./sync/SyncCrypto.js";
+export type { SyncBackend } from "./sync/SyncBackend.js";
+export type { SyncCrypto, AesGcmSyncCryptoOptions } from "./sync/SyncCrypto.js";
+export type { MobileMemoryClientOptions } from "./sync/MobileMemoryClient.js";
+export type { HttpSyncBackendOptions } from "./sync/HttpSyncBackend.js";
 export {
   InMemoryMemoryStore,
   hashEmbed,

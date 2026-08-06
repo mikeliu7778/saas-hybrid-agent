@@ -1,9 +1,10 @@
 import type { SyncMutation, SyncPullResponse, SyncPushRequest } from "../runtime/types.js";
+import type { SyncBackend } from "./SyncBackend.js";
 
 /**
  * CA-3.2 — in-memory sync backend for unit tests (server stand-in).
  */
-export class InMemorySyncBackend {
+export class InMemorySyncBackend implements SyncBackend {
   private seq = 0;
   private readonly log: Array<SyncMutation & { cursor: string }> = [];
 

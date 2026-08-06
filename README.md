@@ -75,7 +75,7 @@ For large-scale personal agents, three constraints rule out “one Pod per user�
 | **I3** / **I3a** | Ingest ↔ trust on Episode/Procedural; delete/👎 lowers recall |
 | **I3b** | Optional control-plane ingest analytics (`POST /v1/ingest/events`, metrics by source/kind) |
 | **I4** / **I4a** | MemoryPack import/export + read-only MCP (`memory_search` / `memory_get`) |
-| **I4b** | Mobile runtime recall + optional E2E Sync — deferred |
+| **I4b** | HTTP Sync + `MobileMemoryClient` recall; optional AES-GCM E2E payload crypto |
 | **I5** / **I5a** | Workspace content-hash chunking; on-device summary + lexical rerank |
 | **I5b-A** | Chunk Sync: manifest-only Sync + on-demand `ChunkBackend` pull |
 | **I5b-B** | Continue / Aider / OpenCode ingest adapters |
@@ -187,7 +187,7 @@ Open `http://localhost:5173/web/`: register a device → send messages → 👍/
 | `POST /v1/llm/chat` | bearer | SSE (default) or JSON (`stream: false`); `content` may be string or `[{ type, text?, image_url? }]` (images: user role only) |
 | `GET /v1/llm/capabilities?model=&provider=` | bearer | `{ vision, model, provider? }` — static vision table; client gates image attach |
 | `POST /v1/llm/embeddings` | bearer | `{ model, data: [{ embedding, index }] }` |
-| `POST /v1/sync/push` | bearer | Mutation upload (Phase A **plaintext**, not E2E) |
+| `POST /v1/sync/push` | bearer | Mutation upload (Phase A **plaintext** by default; client may send E2E-wrapped payload) |
 | `GET /v1/sync/pull?since=cursor` | bearer | Monotonic cursor pull |
 | `GET /v1/quota` | bearer | Usage vs limits |
 | `POST /v1/trust/events` | bearer | Batch append; idempotent on `eventId` → `{ accepted, duplicates }` |

@@ -282,16 +282,18 @@ I0 协议与 Cursor 闭环（本期）
 
 ### 11.6 I4 — 多端产品化与外露
 
-**状态：I4a 已实现（MemoryPack + 只读 MCP）；移动 / E2E 为 I4b**
+**状态：I4a 已实现；I4b 已实现（同协议 HTTP Sync + MobileMemoryClient + 可选 E2E；无原生 App 壳）**
 
 - **I4a**
   - `exportMemoryPack` / `importMemoryPack`（JSON schema v1：semantic / episode / procedural / workspace）
   - 只读 API：`memorySearch` / `memoryGet`
   - MCP stdio server：`memory_search` / `memory_get`（`HYBRID_MEMORY_PACK` 加载 pack；`npm run mcp`）
   - 主叙事仍是个人助理；MCP 仅为外挂召回，非主产品  
-- **I4b（后置）**
-  - iOS / Android 同协议 Runtime 召回 Sync Memory  
-  - 可选 E2E Sync  
+- **I4b**
+  - `HttpSyncBackend`：Web / iOS / Android 宿主共用 `POST /v1/sync/push` + `GET /v1/sync/pull`  
+  - `MobileMemoryClient`：`refresh()` → Sync pull，再 `recall()` 同协议 Memory 检索  
+  - 可选 E2E：`AesGcmSyncCrypto` 信封加密 mutation `payload`（控制面只存密文）；默认 `plaintextSyncCrypto`  
+  - **不做**：本仓发布完整 iOS/Android 原生壳 UI；宿主用 RN/原生包一层即可  
 
 ### 11.7 I5 — 增强
 

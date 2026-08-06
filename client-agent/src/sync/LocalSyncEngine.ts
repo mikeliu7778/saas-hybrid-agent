@@ -1,8 +1,9 @@
 import type { SyncEngine, SyncMutation } from "../runtime/types.js";
-import type { InMemorySyncBackend } from "./InMemorySyncBackend.js";
+import type { SyncBackend } from "./SyncBackend.js";
 import type { InMemoryMemoryStore } from "../memory/InMemoryMemoryStore.js";
 import type { WorkspaceChunkStore, ChunkedFileMeta } from "../workspace/chunks.js";
 import type { ChunkBackend } from "./chunkBackend.js";
+import { plaintextSyncCrypto, type SyncCrypto } from "./SyncCrypto.js";
 
 export interface LocalSyncState {
   deviceId: string;
@@ -15,21 +16,25 @@ export interface LocalSyncEngineOptions {
   chunks?: WorkspaceChunkStore;
   /** Shared / remote blob store for chunk bodies (not Sync log). */
   chunkBackend?: ChunkBackend;
+  /** I4b optional E2E envelope (default plaintext). */
+  crypto?: SyncCrypto;
 }
 
 /**
- * CA-E6 — client SyncEngine over InMemorySyncBackend (or HTTP later).
+ * CA-E6 — client SyncEngine over SyncBackend (in-memory or HTTP).
  * Conflict: LWW by updatedAt, then higher version.
  * I5b-A: workspace_file manifests sync via mutations; bodies via ChunkBackend.
+ * I4b: optional E2E payload crypto; HttpSyncBackend for mobile/web.
  */
 export class LocalSyncEngine implements SyncEngine {
   readonly state: LocalSyncState;
   private timer: ReturnType<typeof setInterval> | null = null;
   private readonly chunks?: WorkspaceChunkStore;
   private readonly chunkBackend?: ChunkBackend;
+  private readonly crypto: SyncCrypto;
 
   constructor(
-    private readonly backend: InMemorySyncBackend,
+    private readonly backend: SyncBackend,
     private readonly memory: InMemoryMemoryStore,
     deviceId: string,
     opts?: LocalSyncEngineOptions,
@@ -37,6 +42,7 @@ export class LocalSyncEngine implements SyncEngine {
     this.state = { deviceId, pending: [], lastPullCursor: "0" };
     this.chunks = opts?.chunks;
     this.chunkBackend = opts?.chunkBackend;
+    this.crypto = opts?.crypto ?? plaintextSyncCrypto;
   }
 
   enqueue(mutation: SyncMutation): void {
@@ -46,13 +52,21 @@ export class LocalSyncEngine implements SyncEngine {
   async push(): Promise<void> {
     if (this.state.pending.length === 0) return;
     const batch = this.state.pending.splice(0, this.state.pending.length);
-    this.backend.push({ deviceId: this.state.deviceId, mutations: batch });
+    const wrapped: SyncMutation[] = [];
+    for (const m of batch) {
+      wrapped.push({
+        ...m,
+        payload: await this.crypto.wrapPayload(m.payload),
+      });
+    }
+    await this.backend.push({ deviceId: this.state.deviceId, mutations: wrapped });
   }
 
   async pull(): Promise<void> {
-    const res = this.backend.pull(this.state.lastPullCursor);
+    const res = await this.backend.pull(this.state.lastPullCursor);
     for (const m of res.mutations) {
-      this.applyRemote(m);
+      const payload = await this.crypto.unwrapPayload(m.payload ?? {});
+      await this.applyRemote({ ...m, payload });
     }
     this.state.lastPullCursor = res.cursor;
   }
@@ -121,7 +135,7 @@ export class LocalSyncEngine implements SyncEngine {
     return this.chunks.missingHashes(path).length === 0;
   }
 
-  private applyRemote(m: SyncMutation): void {
+  private async applyRemote(m: SyncMutation): Promise<void> {
     if (m.entityType === "semantic") {
       const existing = this.memory.semantic.get(m.entityId);
       if (existing && !wins(m, existing.version, existing.updatedAt)) return;
