@@ -269,13 +269,16 @@ I0 协议与 Cursor 闭环（本期）
 
 ### 11.5 I3 — 质量飞轮
 
-**状态：I3a 已实现（端上）；控制面 ingest 分析流后置为 I3b**
+**状态：I3a 已实现（端上）；I3b 已实现（控制面 ingest 分析流，仅元数据）**
 
 - 用户删 Episode / 👎 摘要 → trust `distrust`，`deprecated` 后不再召回  
 - 续用 recalled Semantic / Episode / Procedural → `trust` 强化（`applyTrust` 覆盖三类 Memory）  
 - Episode / Procedural 召回按 `trustScore` 加权，过滤 `deprecated`  
 - Demo：Episodes 支持 👎 与删除  
-- **I3b（后置）**：可选控制面 `POST /v1/ingest/events` append-only；按 `source`/`kind` 的 ingest metrics  
+- **I3b**
+  - 可选 `POST /v1/ingest/events` append-only（`eventId` 幂等）；**不**上传 summary 正文  
+  - `GET /v1/ingest/metrics` 按日聚合 `bySource` / `byKind`  
+  - client：`HttpIngestEventClient` + `toIngestAnalyticsEvents`；默认不上报，由宿主决定是否调用  
 
 ### 11.6 I4 — 多端产品化与外露
 

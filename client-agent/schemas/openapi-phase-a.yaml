@@ -248,6 +248,66 @@ paths:
           description: Unsupported grain (only day supported)
         "401":
           description: Unauthorized
+  /v1/ingest/events:
+    post:
+      operationId: appendIngestAnalyticsEvents
+      summary: Append ingest analytics events (metadata only; idempotent on eventId)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IngestEventsRequest"
+      responses:
+        "200":
+          description: Batch processed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IngestEventsResponse"
+        "400":
+          description: Invalid batch
+        "401":
+          description: Unauthorized
+  /v1/ingest/metrics:
+    get:
+      operationId: getIngestMetrics
+      summary: Aggregate ingest analytics by day (bySource / byKind)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: from
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: grain
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [day]
+            default: day
+      responses:
+        "200":
+          description: Aggregated buckets
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IngestMetricsResponse"
+        "400":
+          description: Unsupported grain
+        "401":
+          description: Unauthorized
 components:
   securitySchemes:
     bearerAuth:
@@ -552,6 +612,66 @@ components:
           type: integer
         correct:
           type: integer
+        byKind:
+          type: object
+          additionalProperties:
+            type: integer
+    IngestAnalyticsEventDto:
+      type: object
+      required: [eventId, source, kind, ts]
+      properties:
+        eventId:
+          type: string
+        source:
+          type: string
+        kind:
+          type: string
+        ts:
+          type: string
+          format: date-time
+        deviceId:
+          type: string
+        nativeSessionId:
+          type: string
+        pathCount:
+          type: integer
+    IngestEventsRequest:
+      type: object
+      required: [events]
+      properties:
+        events:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/IngestAnalyticsEventDto"
+    IngestEventsResponse:
+      type: object
+      required: [accepted, duplicates]
+      properties:
+        accepted:
+          type: integer
+        duplicates:
+          type: integer
+    IngestMetricsResponse:
+      type: object
+      required: [buckets]
+      properties:
+        buckets:
+          type: array
+          items:
+            $ref: "#/components/schemas/IngestMetricsBucket"
+    IngestMetricsBucket:
+      type: object
+      required: [key, total, bySource, byKind]
+      properties:
+        key:
+          type: string
+        total:
+          type: integer
+        bySource:
+          type: object
+          additionalProperties:
+            type: integer
         byKind:
           type: object
           additionalProperties:

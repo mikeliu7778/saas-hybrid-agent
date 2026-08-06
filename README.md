@@ -73,7 +73,7 @@ For large-scale personal agents, three constraints rule out “one Pod per user�
 | **I1b** | Claude Code / Codex adapters — **deferred / not planned** |
 | **I2** / **I2a** | Unified entry: recall Memory, openai tools vs cursor sidecar (no client tools), hybrid ingest |
 | **I3** / **I3a** | Ingest ↔ trust on Episode/Procedural; delete/👎 lowers recall |
-| **I3b** | Optional control-plane ingest event analytics — deferred |
+| **I3b** | Optional control-plane ingest analytics (`POST /v1/ingest/events`, metrics by source/kind) |
 | **I4** / **I4a** | MemoryPack import/export + read-only MCP (`memory_search` / `memory_get`) |
 | **I4b** | Mobile runtime recall + optional E2E Sync — deferred |
 | **I5** / **I5a** | Workspace content-hash chunking; on-device summary + lexical rerank |
@@ -191,6 +191,9 @@ Open `http://localhost:5173/web/`: register a device → send messages → 👍/
 | `GET /v1/sync/pull?since=cursor` | bearer | Monotonic cursor pull |
 | `GET /v1/quota` | bearer | Usage vs limits |
 | `POST /v1/trust/events` | bearer | Batch append; idempotent on `eventId` → `{ accepted, duplicates }` |
+| `GET /v1/trust/metrics` | bearer | Aggregate trust counts by day |
+| `POST /v1/ingest/events` | bearer | Optional ingest **analytics** only (source/kind/ts; no summary body); idempotent on `eventId` |
+| `GET /v1/ingest/metrics` | bearer | Aggregate ingest counts by day (`bySource`, `byKind`) |
 | `GET /v1/trust/metrics?from=&to=&grain=day` | bearer | Per-day counts by signal and `kind` |
 | `GET /v1/health` | none | Health check |
 

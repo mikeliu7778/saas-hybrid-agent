@@ -100,6 +100,14 @@ export {
 } from "./storage/memoryOpfsRoot.js";
 export { HttpTrustEventClient } from "./trust/HttpTrustEventClient.js";
 export type { HttpTrustEventClientOptions } from "./trust/HttpTrustEventClient.js";
+export {
+  HttpIngestEventClient,
+  toIngestAnalyticsEvents,
+} from "./ingest/HttpIngestEventClient.js";
+export type {
+  HttpIngestEventClientOptions,
+  IngestAnalyticsEvent,
+} from "./ingest/HttpIngestEventClient.js";
 export { TrustEventQueue } from "./trust/TrustEventQueue.js";
 export type { TrustEventClient } from "./trust/TrustEventQueue.js";
 export { TrustSignalCollector } from "./trust/TrustSignalCollector.js";
