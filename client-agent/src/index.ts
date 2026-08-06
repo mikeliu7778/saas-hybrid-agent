@@ -47,6 +47,8 @@ export type {
   ChunkedFileMeta,
   ChunkTextOptions,
 } from "./workspace/chunks.js";
+export { InMemoryChunkBackend } from "./sync/chunkBackend.js";
+export type { ChunkBackend } from "./sync/chunkBackend.js";
 export { fetchLlmCapabilities } from "./llm/HttpLlmCapabilities.js";
 export type {
   FetchLlmCapabilitiesOptions,

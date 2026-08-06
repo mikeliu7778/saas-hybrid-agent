@@ -175,7 +175,13 @@ export interface MemoryOrchestrator {
 }
 
 export interface SyncMutation {
-  entityType: "message" | "semantic" | "episode" | "procedural" | "session_meta";
+  entityType:
+    | "message"
+    | "semantic"
+    | "episode"
+    | "procedural"
+    | "session_meta"
+    | "workspace_file";
   entityId: string;
   version: number;
   updatedAt: string;

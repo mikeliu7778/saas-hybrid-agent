@@ -77,7 +77,10 @@ For large-scale personal agents, three constraints rule out “one Pod per user�
 | **I4** / **I4a** | MemoryPack import/export + read-only MCP (`memory_search` / `memory_get`) |
 | **I4b** | Mobile runtime recall + optional E2E Sync — deferred |
 | **I5** / **I5a** | Workspace content-hash chunking; on-device summary + lexical rerank |
-| **I5b** | Chunk sync, more host adapters, Dev Companion, real tiny models — deferred |
+| **I5b-A** | Chunk Sync: manifest-only Sync + on-demand `ChunkBackend` pull |
+| **I5b-B** | Continue / Aider / OpenCode ingest adapters |
+| **I5b-C** | Dev Companion / remote terminal → ingest — deferred |
+| **I5b-D** | Real tiny models (onnx/wasm) — deferred |
 
 **Explicitly deferred / never:** multi-tenant billing console / admin UI; same-session hybrid tool execution (some tools on cloud workers); central cross-user vector search / public RAG; Cursor Cloud Agent / `/v1/agents/**`; mapping Cursor internal tools to control-plane `tool_calls`; cloud auto-rewrite of user Memory.
 

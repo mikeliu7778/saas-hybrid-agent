@@ -5,6 +5,9 @@ export type IngestSource =
   | "claude_code"
   | "codex"
   | "hybrid"
+  | "continue"
+  | "aider"
+  | "opencode"
   | "other";
 
 export type IngestKind =

@@ -229,7 +229,9 @@ I0 协议与 Cursor 闭环（本期）
 | **I3** | Ingest ↔ Trust 采信；可选控制面 `ingest_events` 分析流 | I0 + trust API | P1 |
 | **I4** | iOS/Android 同协议召回；可选 E2E Sync；MCP 只读暴露个人库 | PRD Phase B；I1 | P1 |
 | **I5a** | Workspace 内容哈希分块；端侧摘要/词法重排（无云） | PRD Phase C 前半 | P2 |
-| **I5b** | 分块 Sync、更多 host、Dev Companion、真小模型 | PRD Phase C 后半 | P2 |
+| **I5b-A** | 分块 Sync（清单 + ChunkBackend 按需） | I5a | **已实现** |
+| **I5b-B** | Continue / Aider / OpenCode adapters | I0 schema | **已实现** |
+| **I5b-C/D** | Dev Companion；真小模型 | — | 后置 |
 
 ### 11.2 I0 — 协议与 Cursor 闭环（本期）
 
@@ -289,17 +291,32 @@ I0 协议与 Cursor 闭环（本期）
 
 ### 11.7 I5 — 增强
 
-**状态：I5a 已实现（分块 + 端侧摘要/重排）；更多 host / Dev Companion 为 I5b**
+**状态：I5a 已实现；I5b-A / I5b-B 已实现；C/D 后置**
 
 - **I5a**
   - Workspace 大文件：**内容哈希分块**（`WorkspaceChunkStore` / `chunkText`），支持按 hash 按需取块与 GC  
   - 端侧 **无云** 摘要：`localSessionSummary`（Hybrid ingest 使用）  
   - 端侧 **重排**：`rerankMemoryHits`（`memorySearch` / MCP 召回）  
-- **I5b（后置）**
-  - 分块经 Sync 多端按需拉取（控制面只存 hash 清单）  
-  - 更多 host adapter（Aider / Continue / OpenCode）  
-  - Dev Companion / 远程终端会话走 ingest  
-  - 真小模型（onnx/wasm）替换规则摘要  
+
+#### I5b 切片（A → B → C → D）
+
+| 切片 | 主题 | 状态 | 说明 |
+|------|------|------|------|
+| **A** | **分块 Sync** | **已实现** | Sync 只推 `workspace_file` **hash 清单**（path / contentHash / chunkHashes）；chunk **正文**走独立 `ChunkBackend` 按需拉取。控制面不存大文件 body。 |
+| **B** | **更多 host adapter** | **已实现** | Continue / Aider / OpenCode → 同一 `ingest_event`；薄 Python adapter，不扩 Java。 |
+| **C** | **Dev Companion** | 后置 | 远程终端 / Dev Companion 会话走 ingest；产品面独立，不阻塞 A/B。 |
+| **D** | **真小模型** | 后置 | onnx/wasm 替换规则摘要与重排；模型选型与体积另开。 |
+
+**I5b-A 协议要点**
+
+- `SyncMutation.entityType = "workspace_file"`：payload 仅 meta，**禁止**带 chunk content  
+- `ChunkBackend.put/get(hash)`：端侧或共享 blob（测试用 `InMemoryChunkBackend`）；生产可换 HTTP/P2P  
+- 对端 pull 到清单后 `hydrateWorkspaceFile(path)`：缺块则 `get` 补齐，再 `readFile`  
+
+**I5b-B 要点**
+
+- `source` 扩展：`continue` / `aider` / `opencode`  
+- 输出仍为 `session_summary` + `file_touch`；走现有 scrub / `applyIngest`  
 
 ### 11.8 明确不进 Roadmap（保持 No-Go）
 

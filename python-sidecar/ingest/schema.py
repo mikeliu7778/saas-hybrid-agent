@@ -4,7 +4,18 @@ from typing import Any
 
 
 REQUIRED_FIELDS = ("event_id", "schema_version", "source", "kind", "summary", "paths", "scrubbed")
-ALLOWED_SOURCES = frozenset({"cursor", "claude_code", "codex", "hybrid", "other"})
+ALLOWED_SOURCES = frozenset(
+    {
+        "cursor",
+        "claude_code",
+        "codex",
+        "hybrid",
+        "continue",
+        "aider",
+        "opencode",
+        "other",
+    }
+)
 ALLOWED_KINDS = frozenset(
     {
         "session_summary",

@@ -1,0 +1,17 @@
+{
+  "sessionId": "cont-sess-1",
+  "history": [
+    {
+      "message": {
+        "role": "user",
+        "content": "Please fix the flake in src/auth/AuthService.ts"
+      }
+    },
+    {
+      "message": {
+        "role": "assistant",
+        "content": "Patched AuthService.ts. Do not commit sk-abcdefghijklmnopqrstuvwxyz012345."
+      }
+    }
+  ]
+}

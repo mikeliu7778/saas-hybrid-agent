@@ -100,6 +100,22 @@ export class WorkspaceChunkStore {
     return this.chunks.get(hash);
   }
 
+  /** Apply Sync manifest without bodies (I5b-A). */
+  applyManifest(meta: ChunkedFileMeta): void {
+    this.files.set(meta.path, { ...meta, chunkHashes: [...meta.chunkHashes] });
+  }
+
+  putChunkBody(hash: string, content: string, index = 0): void {
+    this.chunks.set(hash, { index, hash, content });
+  }
+
+  /** Hashes listed in meta but missing locally. */
+  missingHashes(path: string): string[] {
+    const meta = this.files.get(path);
+    if (!meta) return [];
+    return meta.chunkHashes.filter((h) => !this.chunks.has(h));
+  }
+
   /** Reconstruct file from local chunks; returns undefined if any chunk missing. */
   async readFile(path: string): Promise<string | undefined> {
     const meta = this.files.get(path);

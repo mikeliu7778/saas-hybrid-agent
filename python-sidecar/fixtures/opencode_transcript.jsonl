@@ -1,0 +1,4 @@
+{"role":"user","content":"Open src/sync/LocalSyncEngine.ts and explain chunk sync"}
+{"role":"assistant","content":"LocalSyncEngine publishes workspace_file manifests. Secret sk-abcdefghijklmnopqrstuvwxyz012345 redacted in ingest."}
+{"role":"user","content":"Thanks"}
+{"role":"assistant","content":"Also check README.md"}
