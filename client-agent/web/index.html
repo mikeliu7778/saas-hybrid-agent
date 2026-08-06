@@ -28,6 +28,9 @@
       #imagePreview .thumb button {
         position: absolute; top: 0; right: 0; padding: 0 0.25rem; font-size: 0.75rem; line-height: 1.2;
       }
+      #mcpHint code { font-size: 0.75rem; word-break: break-all; }
+      #searchHits { list-style: none; padding: 0; margin: 0.25rem 0 0.75rem; max-height: 8rem; overflow: auto; }
+      #searchHits li { margin: 0.25rem 0; font-size: 0.8rem; word-break: break-word; }
       @media (max-width: 720px) {
         .layout { grid-template-columns: 1fr; }
         aside { border-left: none; border-top: 1px solid #ddd; padding-left: 0; padding-top: 1rem; }
@@ -36,7 +39,10 @@
   </head>
   <body>
     <h1>Hybrid Agent</h1>
-    <p>可交互演示：统一入口选 Engine → 先召回 Memory → 对话；Ingest / 采信 / Memory。</p>
+    <p>
+      可交互演示：上传 Cursor / Continue / Aider 会话 → 写入个人 Memory → 搜索与对话召回。
+      也可导出 MemoryPack 给 MCP 使用。
+    </p>
     <div class="row">
       <input id="baseUrl" value="http://localhost:8080" size="40" />
       <label>
@@ -63,10 +69,26 @@
         </div>
       </main>
       <aside>
-        <h3>Memory</h3>
+        <h3>个人 Memory</h3>
         <div class="row">
-          <button id="ingestSample" type="button" disabled>Ingest sample Cursor</button>
+          <input id="memQuery" style="flex:1; min-width:8rem" placeholder="搜索 Memory…" disabled />
+          <button id="memSearch" type="button" disabled>搜索</button>
         </div>
+        <ul id="searchHits" class="meta"></ul>
+        <div class="row">
+          <button id="ingestSample" type="button" disabled>样例 Cursor</button>
+          <button id="ingestUploadBtn" type="button" disabled>上传会话</button>
+          <input type="file" id="ingestFile" accept=".jsonl,.json,.md,.txt,application/json,text/plain,text/markdown" hidden />
+        </div>
+        <div class="row">
+          <button id="exportPack" type="button" disabled>导出 Pack</button>
+          <button id="importPackBtn" type="button" disabled>导入 Pack</button>
+          <input type="file" id="importPackFile" accept=".json,application/json" hidden />
+        </div>
+        <p id="mcpHint" class="meta">
+          MCP：导出 Pack 后执行<br />
+          <code>HYBRID_MEMORY_PACK=/path/to/pack.json npm run mcp</code>
+        </p>
         <h4 class="meta">Semantic</h4>
         <ul id="mem"></ul>
         <h4 class="meta">Episodes (ingest)</h4>

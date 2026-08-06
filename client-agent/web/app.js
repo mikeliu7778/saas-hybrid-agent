@@ -17,6 +17,7 @@ import {
   TrustEventQueue,
   TrustSignalCollector,
   fetchLlmCapabilities,
+  parseTranscriptUpload,
 } from "../dist/index.js";
 
 const $ = (id) => document.getElementById(id);
@@ -279,8 +280,106 @@ async function ingestSample() {
   }
 }
 
+/**
+ * @param {string} text
+ * @param {string} fileName
+ */
+async function ingestTranscriptText(text, fileName) {
+  if (!runtime || typeof runtime.applyIngest !== "function") {
+    setStatus("请先注册设备");
+    return;
+  }
+  try {
+    const events = parseTranscriptUpload(text, { fileName });
+    const result = await runtime.applyIngest(events);
+    setStatus(
+      `已导入 ${fileName}: events=${events.length} epi=${result.accepted} sem=${result.semanticAccepted ?? 0} proc=${result.proceduralAccepted ?? 0} dup=${result.duplicates} ws+=${result.workspacePathsAdded}`,
+    );
+    await refreshMemory();
+  } catch (e) {
+    setStatus(`上传解析失败: ${e instanceof Error ? e.message : String(e)}`);
+  }
+}
+
+async function onIngestFileSelected(file) {
+  const text = await file.text();
+  await ingestTranscriptText(text, file.name);
+}
+
+async function runMemorySearch() {
+  if (!runtime || typeof runtime.searchMemory !== "function") {
+    setStatus("请先注册设备（需要 searchMemory）");
+    return;
+  }
+  const q = $("memQuery").value.trim();
+  const ul = $("searchHits");
+  ul.innerHTML = "";
+  if (!q) {
+    setStatus("请输入搜索词");
+    return;
+  }
+  try {
+    const hits = await runtime.searchMemory(q, 8);
+    if (!hits.length) {
+      const li = document.createElement("li");
+      li.textContent = "（无命中）";
+      ul.appendChild(li);
+      setStatus(`搜索「${q}」无命中`);
+      return;
+    }
+    for (const h of hits) {
+      const li = document.createElement("li");
+      li.textContent = `[${h.kind}] ${h.text.slice(0, 160)} (score=${Number(h.score).toFixed(2)})`;
+      ul.appendChild(li);
+    }
+    setStatus(`搜索「${q}」命中 ${hits.length} 条`);
+  } catch (e) {
+    setStatus(`搜索失败: ${e instanceof Error ? e.message : String(e)}`);
+  }
+}
+
+async function exportPack() {
+  if (!runtime || typeof runtime.exportMemoryPack !== "function") {
+    setStatus("请先注册设备");
+    return;
+  }
+  try {
+    const bytes = await runtime.exportMemoryPack();
+    const blob = new Blob([bytes], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `hybrid-memory-${Date.now()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setStatus(`已导出 MemoryPack（${bytes.byteLength} bytes）。MCP: HYBRID_MEMORY_PACK=该文件 npm run mcp`);
+  } catch (e) {
+    setStatus(`导出失败: ${e instanceof Error ? e.message : String(e)}`);
+  }
+}
+
+async function importPackFile(file) {
+  if (!runtime || typeof runtime.importMemoryPack !== "function") {
+    setStatus("请先注册设备");
+    return;
+  }
+  try {
+    const buf = new Uint8Array(await file.arrayBuffer());
+    await runtime.importMemoryPack(buf);
+    setStatus(`已导入 Pack: ${file.name}`);
+    await refreshMemory();
+  } catch (e) {
+    setStatus(`导入失败: ${e instanceof Error ? e.message : String(e)}`);
+  }
+}
+
 function setIngestEnabled(on) {
   $("ingestSample").disabled = !on;
+  $("ingestUploadBtn").disabled = !on;
+  $("exportPack").disabled = !on;
+  $("importPackBtn").disabled = !on;
+  $("memQuery").disabled = !on;
+  $("memSearch").disabled = !on;
 }
 
 function selectedProvider() {
@@ -512,6 +611,28 @@ async function sendMessage() {
 $("register").onclick = () => void registerDevice();
 $("newSession").onclick = () => void startNewSession();
 $("ingestSample").onclick = () => void ingestSample();
+$("ingestUploadBtn").onclick = () => $("ingestFile").click();
+$("ingestFile").onchange = () => {
+  const input = $("ingestFile");
+  const file = input.files?.[0];
+  input.value = "";
+  if (file) void onIngestFileSelected(file);
+};
+$("memSearch").onclick = () => void runMemorySearch();
+$("memQuery").addEventListener("keydown", (ev) => {
+  if (ev.key === "Enter") {
+    ev.preventDefault();
+    void runMemorySearch();
+  }
+});
+$("exportPack").onclick = () => void exportPack();
+$("importPackBtn").onclick = () => $("importPackFile").click();
+$("importPackFile").onchange = () => {
+  const input = $("importPackFile");
+  const file = input.files?.[0];
+  input.value = "";
+  if (file) void importPackFile(file);
+};
 $("send").onclick = () => void sendMessage();
 $("attachImage").onclick = () => $("imageFile").click();
 $("imageFile").onchange = () => {

@@ -29,7 +29,9 @@ import {
 import {
   decodeMemoryPack,
   encodeMemoryPack,
+  memorySearch,
 } from "../memory/memoryPack.js";
+import type { MemoryHit } from "../memory/memoryPack.js";
 import {
   getDefaultOnDeviceIntelligence,
   type OnDeviceIntelligence,
@@ -192,6 +194,8 @@ export class DefaultClientAgentRuntime implements ClientAgentRuntime {
       throw new Error("importMemoryPack: memory store must be InMemoryMemoryStore");
     }
     decodeMemoryPack(this.opts.memory, data);
+    const flush = (this.opts.memory as { flush?: () => Promise<void> }).flush;
+    if (typeof flush === "function") await flush.call(this.opts.memory);
   }
 
   async exportMemoryPack(): Promise<Uint8Array> {
@@ -199,6 +203,15 @@ export class DefaultClientAgentRuntime implements ClientAgentRuntime {
       throw new Error("exportMemoryPack: memory store must be InMemoryMemoryStore");
     }
     return encodeMemoryPack(this.opts.memory);
+  }
+
+  async searchMemory(query: string, limit = 8): Promise<MemoryHit[]> {
+    if (!(this.opts.memory instanceof InMemoryMemoryStore)) {
+      throw new Error("searchMemory: memory store must be InMemoryMemoryStore");
+    }
+    return memorySearch(this.opts.memory, query, limit, {
+      onDevice: this.opts.onDevice ?? getDefaultOnDeviceIntelligence(),
+    });
   }
 
   async pushSync(): Promise<void> {

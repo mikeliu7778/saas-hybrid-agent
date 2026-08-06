@@ -135,6 +135,13 @@ export type {
 export type { IngestEvent, IngestKind, IngestSource } from "./ingest/types.js";
 export { scrubText, scrubEvent } from "./ingest/scrub.js";
 export { applyIngestEvents } from "./ingest/applyIngest.js";
+export {
+  parseTranscriptUpload,
+  parseJsonlTranscript,
+  parseContinueSessionJson,
+  parseAiderHistoryMd,
+} from "./ingest/parseTranscript.js";
+export type { TranscriptFormat } from "./ingest/parseTranscript.js";
 export type {
   ApplyIngestResult,
   ApplyIngestEpisodeDraft,

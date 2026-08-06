@@ -101,7 +101,26 @@ cd client-agent
 HYBRID_MEMORY_PACK=/path/to/pack.json npm run mcp
 ```
 
-## Build
+## Web demo (usable)
+
+```bash
+# terminal 1 — control plane
+./scripts/dev.sh   # or start server + optional sidecar
+
+# terminal 2
+cd client-agent && npm run build && npm run demo:web
+# open http://localhost:5173/web/
+```
+
+After **注册设备**:
+
+1. **上传会话** — Cursor `.jsonl` / Continue `.json` / Aider `.md` → ingest → Episodes / Semantic / Workspace  
+2. **样例 Cursor** — one-click sample if you have no file yet  
+3. **搜索 Memory** — same recall path as MCP `memory_search`  
+4. **导出 Pack** — download JSON; then `HYBRID_MEMORY_PACK=… npm run mcp`  
+5. **导入 Pack** — restore Memory on this browser  
+6. Chat as usual — turns also write Hybrid episodes and recall Memory  
+
 
 ```bash
 ./mvnw -pl server -am test

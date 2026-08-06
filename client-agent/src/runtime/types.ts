@@ -2,6 +2,7 @@
 
 import type { TrustEvent, TrustSignal, TrustTarget } from "../trust/types.js";
 import type { IngestEvent } from "../ingest/types.js";
+import type { MemoryHit } from "../memory/memoryPack.js";
 
 export type TurnStatus = "completed" | "cancelled" | "failed" | "budget_exhausted";
 
@@ -89,6 +90,8 @@ export interface ClientAgentRuntime {
   startBackgroundSync(): void;
   submitFeedback(input: SubmitFeedbackInput): Promise<void>;
   listMemory(): Promise<MemoryListItem[]>;
+  /** Local Memory search (same path as MCP memory_search). */
+  searchMemory?(query: string, limit?: number): Promise<MemoryHit[]>;
   deleteMemory(id: string): Promise<void>;
   setTrustReportingEnabled(enabled: boolean): void;
   applyIngest?(events: IngestEvent[]): Promise<ApplyIngestStoreResult>;
