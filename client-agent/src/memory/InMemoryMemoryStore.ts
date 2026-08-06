@@ -1,8 +1,12 @@
 import type {
+  ApplyIngestStoreResult,
+  EpisodeListItem,
   MemoryBundle,
   MemoryListItem,
   MemoryOrchestrator,
 } from "../runtime/types.js";
+import { applyIngestEvents } from "../ingest/applyIngest.js";
+import type { IngestEvent } from "../ingest/types.js";
 import { applyTrustToSemantic } from "../trust/applyTrust.js";
 import type { TrustEvent } from "../trust/types.js";
 
@@ -34,6 +38,9 @@ export interface EpisodeRow {
   deviceId: string;
   version: number;
   tombstone?: boolean;
+  /** Ingest source tool, e.g. cursor */
+  source?: string;
+  nativeSessionId?: string;
 }
 
 export type EmbedFn = (text: string) => Promise<{ embedding: number[]; modelId: string }>;
@@ -205,5 +212,56 @@ export class InMemoryMemoryStore implements MemoryOrchestrator {
     const row = this.semantic.get(event.targetId);
     if (!row) return;
     this.semantic.set(event.targetId, applyTrustToSemantic(row, event));
+  }
+
+  async applyIngest(events: IngestEvent[]): Promise<ApplyIngestStoreResult> {
+    const draft = applyIngestEvents(events, {
+      existingEpisodeIds: new Set(this.episode.keys()),
+      existingWorkspacePaths: this.workspacePaths,
+    });
+
+    for (const epi of draft.episodes) {
+      if (this.episode.size >= this.maxRows) break;
+      const { embedding } = await this.embed(epi.summary);
+      const now = new Date().toISOString();
+      this.episode.set(epi.id, {
+        id: epi.id,
+        summary: epi.summary,
+        embedding,
+        timeRangeStart: epi.timeRangeStart,
+        timeRangeEnd: epi.timeRangeEnd,
+        messageRefs: [],
+        updatedAt: now,
+        deviceId: this.deviceId,
+        version: 1,
+        source: epi.source,
+        nativeSessionId: epi.nativeSessionId,
+      });
+    }
+
+    for (const p of draft.workspacePathsAdded) {
+      if (!this.workspacePaths.includes(p)) this.workspacePaths.push(p);
+    }
+
+    return {
+      accepted: draft.episodes.length,
+      duplicates: draft.skippedDuplicateIds.length,
+      workspacePathsAdded: draft.workspacePathsAdded.length,
+    };
+  }
+
+  async listEpisode(): Promise<EpisodeListItem[]> {
+    return [...this.episode.values()]
+      .filter((r) => !r.tombstone)
+      .map((r) => ({
+        id: r.id,
+        summary: r.summary,
+        source: r.source,
+        updatedAt: r.updatedAt,
+      }));
+  }
+
+  async listWorkspacePaths(): Promise<string[]> {
+    return [...this.workspacePaths];
   }
 }

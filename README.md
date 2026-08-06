@@ -64,7 +64,18 @@ For large-scale personal agents, three constraints rule out “one Pod per user�
 | **B** | iOS / Android same-protocol runtime; on-device embeddings; procedural Memory; optional E2E Sync |
 | **C** | Large workspace chunking; optional Dev Companion remote terminal; on-device small models for extract / rerank |
 
-**Explicitly deferred:** multi-tenant billing console / admin UI; same-session hybrid tool execution (some tools on cloud workers); central cross-user vector search / public RAG; Cursor Cloud Agent / `/v1/agents/**`; mapping Cursor internal tools to control-plane `tool_calls`.
+**Personal knowledge / multi-tool ingest track** (parallel; see [design §11](docs/superpowers/specs/2026-08-05-multi-tool-ingest-memory-design.md)):
+
+| Stage | Focus |
+|-------|--------|
+| **I0** | Universal `ingest_event` + Cursor adapter → Episode/Workspace + Sync |
+| **I1** | Claude Code / Codex adapters; Semantic / Procedural extraction |
+| **I2** | Unified Hybrid entry that recalls Memory then dispatches sidecars |
+| **I3** | Ingest ↔ trust flywheel; optional ingest analytics stream |
+| **I4** | Mobile recall; optional E2E Sync; read-only MCP over the personal store |
+| **I5** | Large workspace chunking; on-device summarizers; more host adapters |
+
+**Explicitly deferred / never:** multi-tenant billing console / admin UI; same-session hybrid tool execution (some tools on cloud workers); central cross-user vector search / public RAG; Cursor Cloud Agent / `/v1/agents/**`; mapping Cursor internal tools to control-plane `tool_calls`; cloud auto-rewrite of user Memory.
 
 ## Modules
 
@@ -183,6 +194,8 @@ OpenAPI: [`client-agent/schemas/openapi-phase-a.yaml`](client-agent/schemas/open
 | [Trust signal / data flywheel](docs/superpowers/specs/2026-08-04-trust-signal-data-flywheel-design.md) | On-device Memory trust + control-plane metrics |
 | [LLM OpenAI + Cursor sidecar](docs/superpowers/specs/2026-08-04-llm-openai-cursor-sidecar-design.md) | Provider routing and sidecar protocol |
 | [Multimodal vision](docs/superpowers/specs/2026-08-05-multimodal-vision-design.md) | Image parts, capabilities gate, provider paths |
+| [Personal KB competitive research](docs/superpowers/specs/2026-08-05-personal-kb-competitive-research.md) | Market scan; Go on ingest scheme A |
+| [Multi-tool ingest → Memory](docs/superpowers/specs/2026-08-05-multi-tool-ingest-memory-design.md) | I0–I5 ingest track; Cursor → Episode/Workspace |
 
 ## Non-goals (deferred)
 

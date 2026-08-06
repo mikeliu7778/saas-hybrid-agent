@@ -58,3 +58,10 @@ export type {
   TrustSignal,
   TrustTarget,
 } from "./trust/types.js";
+export type { IngestEvent, IngestKind, IngestSource } from "./ingest/types.js";
+export { scrubText, scrubEvent } from "./ingest/scrub.js";
+export { applyIngestEvents } from "./ingest/applyIngest.js";
+export type {
+  ApplyIngestResult,
+  ApplyIngestEpisodeDraft,
+} from "./ingest/applyIngest.js";

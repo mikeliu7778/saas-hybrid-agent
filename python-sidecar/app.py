@@ -8,6 +8,10 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from cursor_runner import CursorRunError, CursorSdkRunner, is_auth_error
+from ingest.adapters.cursor import adapt_cursor_transcript_file
+from ingest.deliver import to_client_events
+from ingest.schema import IngestSchemaError, validate_events
+from ingest.scrub import scrub_event
 
 _MAX_IMAGES = 5
 
@@ -104,7 +108,62 @@ def create_app(runner: CursorSdkRunner | Any | None = None) -> FastAPI:
             "finish_reason": "stop",
         }
 
+    @app.post("/v1/ingest/run")
+    async def ingest_run(request: Request) -> Any:
+        body = await request.json()
+        try:
+            events = await _resolve_ingest_events(body)
+        except FileNotFoundError as exc:
+            return JSONResponse(
+                status_code=400,
+                content={"error": {"code": "transcript_not_found", "message": str(exc)}},
+            )
+        except IngestSchemaError as exc:
+            return JSONResponse(
+                status_code=400,
+                content={"error": {"code": "invalid_ingest_event", "message": str(exc)}},
+            )
+        except ValueError as exc:
+            return JSONResponse(
+                status_code=400,
+                content={"error": {"code": "bad_ingest_request", "message": str(exc)}},
+            )
+
+        client_events = to_client_events(events)
+        delivered = None
+        deliver_url = body.get("deliver_url")
+        if deliver_url:
+            from ingest.deliver import deliver_events
+
+            try:
+                delivered = await deliver_events(str(deliver_url), events)
+            except Exception as exc:
+                return JSONResponse(
+                    status_code=502,
+                    content={
+                        "error": {
+                            "code": "ingest_deliver_failed",
+                            "message": str(exc),
+                        },
+                        "events": client_events,
+                    },
+                )
+
+        return {"events": client_events, "count": len(client_events), "delivered": delivered}
+
     return app
+
+
+async def _resolve_ingest_events(body: dict[str, Any]) -> list[dict[str, Any]]:
+    if body.get("transcript_path"):
+        return adapt_cursor_transcript_file(str(body["transcript_path"]))
+    if body.get("events") is not None:
+        raw = body["events"]
+        if not isinstance(raw, list):
+            raise ValueError("events must be a list")
+        scrubbed = [scrub_event(e) if isinstance(e, dict) else e for e in raw]
+        return validate_events(scrubbed)
+    raise ValueError("provide transcript_path or events")
 
 
 def _error_response(exc: BaseException, code: str | None = None) -> JSONResponse:

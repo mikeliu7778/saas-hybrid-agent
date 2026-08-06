@@ -71,6 +71,14 @@ export class PersistedMemoryStore extends InMemoryMemoryStore {
     await this.flush();
   }
 
+  override async applyIngest(
+    events: import("../ingest/types.js").IngestEvent[],
+  ): Promise<import("../runtime/types.js").ApplyIngestStoreResult> {
+    const result = await super.applyIngest(events);
+    await this.flush();
+    return result;
+  }
+
   override async deleteSemantic(id: string): Promise<void> {
     await super.deleteSemantic(id);
     await this.flush();

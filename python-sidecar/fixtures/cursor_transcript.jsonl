@@ -1,0 +1,4 @@
+{"role":"user","message":{"role":"user","content":[{"type":"text","text":"Please fix the flake in src/auth/AuthService.ts and update README.md"}]}}
+{"role":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"I'll update AuthService and README. Use sk-abcdefghijklmnopqrstuvwxyz012345 for tests only."}]}}
+{"role":"user","message":{"role":"user","content":[{"type":"text","text":"Looks good, commit it."}]}}
+{"role":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Done. Touched src/auth/AuthService.ts."}]}}

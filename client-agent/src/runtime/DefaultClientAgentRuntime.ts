@@ -8,6 +8,8 @@ import type {
   TurnResult,
   MemoryListItem,
   RunTurnImages,
+  ApplyIngestStoreResult,
+  EpisodeListItem,
 } from "./types.js";
 import { ConversationLoop, type SessionState } from "./ConversationLoop.js";
 import type { LlmTransport } from "./types.js";
@@ -19,6 +21,7 @@ import {
   type TrustEventClient,
 } from "../trust/TrustEventQueue.js";
 import { extractText } from "./contentParts.js";
+import type { IngestEvent } from "../ingest/types.js";
 
 export interface DefaultRuntimeOptions {
   llm: LlmTransport;
@@ -200,6 +203,23 @@ export class DefaultClientAgentRuntime implements ClientAgentRuntime {
 
   setTrustReportingEnabled(enabled: boolean): void {
     this.trustQueue.setReportingEnabled(enabled);
+  }
+
+  async applyIngest(events: IngestEvent[]): Promise<ApplyIngestStoreResult> {
+    if (!this.opts.memory?.applyIngest) {
+      return { accepted: 0, duplicates: 0, workspacePathsAdded: 0 };
+    }
+    return this.opts.memory.applyIngest(events);
+  }
+
+  async listEpisodes(): Promise<EpisodeListItem[]> {
+    if (!this.opts.memory?.listEpisode) return [];
+    return this.opts.memory.listEpisode();
+  }
+
+  async listWorkspacePaths(): Promise<string[]> {
+    if (!this.opts.memory?.listWorkspacePaths) return [];
+    return this.opts.memory.listWorkspacePaths();
   }
 
   getSessionMessages(sessionId: string) {

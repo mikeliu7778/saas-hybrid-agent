@@ -1,6 +1,7 @@
 /** Public ClientAgentRuntime contract — design §5.1 / PRD US-P03 */
 
 import type { TrustEvent, TrustSignal, TrustTarget } from "../trust/types.js";
+import type { IngestEvent } from "../ingest/types.js";
 
 export type TurnStatus = "completed" | "cancelled" | "failed" | "budget_exhausted";
 
@@ -35,6 +36,19 @@ export interface MemoryListItem {
   text: string;
   trustScore?: number;
   deprecated?: boolean;
+}
+
+export interface EpisodeListItem {
+  id: string;
+  summary: string;
+  source?: string;
+  updatedAt?: string;
+}
+
+export interface ApplyIngestStoreResult {
+  accepted: number;
+  duplicates: number;
+  workspacePathsAdded: number;
 }
 
 export interface SubmitFeedbackInput {
@@ -73,6 +87,9 @@ export interface ClientAgentRuntime {
   listMemory(): Promise<MemoryListItem[]>;
   deleteMemory(id: string): Promise<void>;
   setTrustReportingEnabled(enabled: boolean): void;
+  applyIngest?(events: IngestEvent[]): Promise<ApplyIngestStoreResult>;
+  listEpisodes?(): Promise<EpisodeListItem[]>;
+  listWorkspacePaths?(): Promise<string[]>;
 }
 
 export interface LlmMessage {
@@ -146,6 +163,9 @@ export interface MemoryOrchestrator {
   applyTrust?(event: TrustEvent): Promise<void>;
   listSemantic?(): Promise<MemoryListItem[]>;
   deleteSemantic?(id: string): Promise<void>;
+  applyIngest?(events: IngestEvent[]): Promise<ApplyIngestStoreResult>;
+  listEpisode?(): Promise<EpisodeListItem[]>;
+  listWorkspacePaths?(): Promise<string[]>;
 }
 
 export interface SyncMutation {

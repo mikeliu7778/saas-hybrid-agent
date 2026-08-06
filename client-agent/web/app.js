@@ -132,34 +132,125 @@ async function sendFeedback(turnMeta, signal, upBtn, downBtn) {
 
 async function refreshMemory() {
   const ul = $("mem");
+  const epiUl = $("epi");
+  const wsUl = $("ws");
   ul.innerHTML = "";
+  epiUl.innerHTML = "";
+  wsUl.innerHTML = "";
   if (!runtime) return;
+
   const items = await runtime.listMemory();
   if (items.length === 0) {
     const li = document.createElement("li");
     li.className = "meta";
     li.textContent = "（空）";
     ul.appendChild(li);
+  } else {
+    for (const item of items) {
+      const li = document.createElement("li");
+      const score =
+        item.trustScore != null ? ` score=${item.trustScore.toFixed(2)}` : "";
+      const dep = item.deprecated ? " [deprecated]" : "";
+      li.appendChild(document.createTextNode(`${item.text}${score}${dep} `));
+      if (!item.deprecated) {
+        const del = document.createElement("button");
+        del.type = "button";
+        del.textContent = "删除";
+        del.onclick = async () => {
+          await runtime.deleteMemory(item.id);
+          await refreshMemory();
+        };
+        li.appendChild(del);
+      }
+      ul.appendChild(li);
+    }
+  }
+
+  const episodes =
+    typeof runtime.listEpisodes === "function" ? await runtime.listEpisodes() : [];
+  if (episodes.length === 0) {
+    const li = document.createElement("li");
+    li.className = "meta";
+    li.textContent = "（空）";
+    epiUl.appendChild(li);
+  } else {
+    for (const e of episodes) {
+      const li = document.createElement("li");
+      const src = e.source ? `[${e.source}] ` : "";
+      li.textContent = `${src}${e.summary}`;
+      epiUl.appendChild(li);
+    }
+  }
+
+  // Workspace hints via runtime API
+  try {
+    const paths =
+      typeof runtime.listWorkspacePaths === "function"
+        ? await runtime.listWorkspacePaths()
+        : [];
+    if (paths.length) {
+      for (const p of paths.slice(0, 20)) {
+        const li = document.createElement("li");
+        li.textContent = p;
+        wsUl.appendChild(li);
+      }
+    } else {
+      const li = document.createElement("li");
+      li.className = "meta";
+      li.textContent = "（空）";
+      wsUl.appendChild(li);
+    }
+  } catch {
+    const li = document.createElement("li");
+    li.className = "meta";
+    li.textContent = "（不可用）";
+    wsUl.appendChild(li);
+  }
+}
+
+/** Sample Cursor-shaped ingest events (camelCase, already scrubbed). */
+const SAMPLE_INGEST_EVENTS = [
+  {
+    eventId: "demo-cursor-sess-1",
+    schemaVersion: "1",
+    source: "cursor",
+    kind: "session_summary",
+    summary: "Please fix auth flake in src/auth/AuthService.ts → Done. Updated AuthService and README.",
+    paths: ["src/auth/AuthService.ts", "README.md"],
+    scrubbed: true,
+    nativeSessionId: "demo-sess-1",
+    tsStart: "2026-08-06T01:00:00.000Z",
+    tsEnd: "2026-08-06T01:20:00.000Z",
+  },
+  {
+    eventId: "demo-cursor-sess-1:path:0",
+    schemaVersion: "1",
+    source: "cursor",
+    kind: "file_touch",
+    summary: "touched src/auth/AuthService.ts",
+    paths: ["src/auth/AuthService.ts"],
+    scrubbed: true,
+  },
+];
+
+async function ingestSample() {
+  if (!runtime || typeof runtime.applyIngest !== "function") {
+    setStatus("请先注册设备（需要 applyIngest）");
     return;
   }
-  for (const item of items) {
-    const li = document.createElement("li");
-    const score =
-      item.trustScore != null ? ` score=${item.trustScore.toFixed(2)}` : "";
-    const dep = item.deprecated ? " [deprecated]" : "";
-    li.appendChild(document.createTextNode(`${item.text}${score}${dep} `));
-    if (!item.deprecated) {
-      const del = document.createElement("button");
-      del.type = "button";
-      del.textContent = "删除";
-      del.onclick = async () => {
-        await runtime.deleteMemory(item.id);
-        await refreshMemory();
-      };
-      li.appendChild(del);
-    }
-    ul.appendChild(li);
+  try {
+    const result = await runtime.applyIngest(SAMPLE_INGEST_EVENTS);
+    setStatus(
+      `Ingest: accepted=${result.accepted} duplicates=${result.duplicates} workspace+=${result.workspacePathsAdded}`,
+    );
+    await refreshMemory();
+  } catch (e) {
+    setStatus(`Ingest 失败: ${e instanceof Error ? e.message : String(e)}`);
   }
+}
+
+function setIngestEnabled(on) {
+  $("ingestSample").disabled = !on;
 }
 
 function selectedProvider() {
@@ -323,6 +414,7 @@ async function registerDevice() {
     );
     await refreshCapabilities();
     await refreshMemory();
+    setIngestEnabled(true);
   } catch (e) {
     setStatus(`注册失败: ${e instanceof Error ? e.message : String(e)}`);
   }
@@ -389,6 +481,7 @@ async function sendMessage() {
 
 $("register").onclick = () => void registerDevice();
 $("newSession").onclick = () => void startNewSession();
+$("ingestSample").onclick = () => void ingestSample();
 $("send").onclick = () => void sendMessage();
 $("attachImage").onclick = () => $("imageFile").click();
 $("imageFile").onchange = () => {
@@ -477,6 +570,7 @@ $("provider").onchange = () => void recreateRuntimeIfRegistered();
     );
     await refreshCapabilities();
     await refreshMemory();
+    setIngestEnabled(true);
   } catch {
     /* ignore stale localStorage */
   }
