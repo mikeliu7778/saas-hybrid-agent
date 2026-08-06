@@ -232,7 +232,7 @@ I0 协议与 Cursor 闭环（本期）
 | **I5b-A** | 分块 Sync（清单 + ChunkBackend 按需） | I5a | **已实现** |
 | **I5b-B** | Continue / Aider / OpenCode adapters | I0 schema | **已实现** |
 | **I5b-C** | Dev Companion 会话 → ingest（无云端 shell） | I0 | **已实现** |
-| **I5b-D** | 真小模型 | — | 后置 |
+| **I5b-D** | 端侧小模型扩展点（rules / tiny / wasm loader） | I5a | **已实现** |
 
 ### 11.2 I0 — 协议与 Cursor 闭环（本期）
 
@@ -292,7 +292,7 @@ I0 协议与 Cursor 闭环（本期）
 
 ### 11.7 I5 — 增强
 
-**状态：I5a 已实现；I5b-A / I5b-B / I5b-C（ingest）已实现；D 后置**
+**状态：I5a 与 I5b-A/B/C/D 均已实现（D 为可插拔端侧小模型扩展点；真实权重由宿主加载）**
 
 - **I5a**
   - Workspace 大文件：**内容哈希分块**（`WorkspaceChunkStore` / `chunkText`），支持按 hash 按需取块与 GC  
@@ -306,7 +306,7 @@ I0 协议与 Cursor 闭环（本期）
 | **A** | **分块 Sync** | **已实现** | Sync 只推 `workspace_file` **hash 清单**（path / contentHash / chunkHashes）；chunk **正文**走独立 `ChunkBackend` 按需拉取。控制面不存大文件 body。 |
 | **B** | **更多 host adapter** | **已实现** | Continue / Aider / OpenCode → 同一 `ingest_event`；薄 Python adapter，不扩 Java。 |
 | **C** | **Dev Companion** | **已实现（ingest 切片）** | 可选 Companion 终端会话 NDJSON → `dev_companion` ingest（`session_summary` / `file_touch` / `procedure_draft`）；**不**在云端执行 shell；完整绑定 UX（US-X01）仍可后置。 |
-| **D** | **真小模型** | 后置 | onnx/wasm 替换规则摘要与重排；模型选型与体积另开。 |
+| **D** | **真小模型** | **已实现（扩展点）** | `OnDeviceIntelligence`：`rules`（默认）或 `tiny`（`TinyModelBackend.embed`）；`HashTinyModelBackend` 零依赖；`loadWasmTinyModelBackend` 动态加载宿主 onnx/wasm，**不**把模型权重打进 client-agent。 |
 
 **I5b-A 协议要点**
 
@@ -325,6 +325,13 @@ I0 协议与 Cursor 闭环（本期）
 - Python：`adapt_companion_session_file`；TS：`DevCompanionSession.toIngestEvents()` → `applyIngest`  
 - ≥2 条 `cmd` 时额外写 `procedure_draft`（终端步骤记忆）  
 - **不做**：云端 shell、Companion 机器绑定 UI（PRD US-X01 完整体验可后置）  
+
+**I5b-D 要点**
+
+- `createOnDeviceIntelligence({ mode: "rules" | "tiny" })`；Runtime `onDevice` / `memorySearch` 可注入  
+- `tiny`：质心句抽取摘要 + cosine 重排；默认 `HashTinyModelBackend`  
+- 真 onnx/wasm：宿主实现 `createTinyModelBackend()`，经 `loadWasmTinyModelBackend({ moduleUrl })` 装入  
+- **不做**：在本仓 vendoring 大模型权重 / 强制下载  
 
 ### 11.8 明确不进 Roadmap（保持 No-Go）
 

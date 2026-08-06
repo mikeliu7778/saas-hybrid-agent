@@ -4,7 +4,8 @@ import type {
   ProceduralRow,
   SemanticRow,
 } from "./InMemoryMemoryStore.js";
-import { rerankMemoryHits } from "./localSummarizer.js";
+import { getDefaultOnDeviceIntelligence } from "./onDeviceIntelligence.js";
+import type { OnDeviceIntelligence } from "./onDeviceIntelligence.js";
 
 export interface MemoryPackV1 {
   schemaVersion: "1";
@@ -67,6 +68,7 @@ export async function memorySearch(
   store: InMemoryMemoryStore,
   query: string,
   limit = 8,
+  opts?: { onDevice?: OnDeviceIntelligence },
 ): Promise<MemoryHit[]> {
   const bundle = await store.retrieve(query);
   const hits: MemoryHit[] = [
@@ -97,7 +99,8 @@ export async function memorySearch(
       score: 0.3,
     })),
   ];
-  return rerankMemoryHits(hits, query).slice(0, limit);
+  const onDevice = opts?.onDevice ?? getDefaultOnDeviceIntelligence();
+  return (await onDevice.rerankHits(hits, query)).slice(0, limit);
 }
 
 /** Read-only get by id (MCP memory_get). */

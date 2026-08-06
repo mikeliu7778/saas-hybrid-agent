@@ -38,6 +38,21 @@ export {
   rerankMemoryHits,
 } from "./memory/localSummarizer.js";
 export {
+  createOnDeviceIntelligence,
+  createRulesOnDeviceIntelligence,
+  createTinyOnDeviceIntelligence,
+  HashTinyModelBackend,
+  loadWasmTinyModelBackend,
+  getDefaultOnDeviceIntelligence,
+  setDefaultOnDeviceIntelligence,
+} from "./memory/onDeviceIntelligence.js";
+export type {
+  OnDeviceIntelligence,
+  TinyModelBackend,
+  WasmTinyModelOptions,
+  CreateOnDeviceOptions,
+} from "./memory/onDeviceIntelligence.js";
+export {
   chunkText,
   contentHash,
   WorkspaceChunkStore,

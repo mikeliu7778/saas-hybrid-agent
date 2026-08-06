@@ -30,7 +30,10 @@ import {
   decodeMemoryPack,
   encodeMemoryPack,
 } from "../memory/memoryPack.js";
-import { localSessionSummary } from "../memory/localSummarizer.js";
+import {
+  getDefaultOnDeviceIntelligence,
+  type OnDeviceIntelligence,
+} from "../memory/onDeviceIntelligence.js";
 import { InMemoryMemoryStore } from "../memory/InMemoryMemoryStore.js";
 
 export interface DefaultRuntimeOptions {
@@ -45,6 +48,8 @@ export interface DefaultRuntimeOptions {
   trustCollector?: TrustSignalCollector;
   trustQueue?: TrustEventQueue;
   trustClient?: TrustEventClient;
+  /** I5b-D: on-device summary/rerank (default: rules). */
+  onDevice?: OnDeviceIntelligence;
 }
 
 export class DefaultClientAgentRuntime implements ClientAgentRuntime {
@@ -140,15 +145,18 @@ export class DefaultClientAgentRuntime implements ClientAgentRuntime {
 
       // I2: feed Hybrid turns back into personal KB as ingest episodes.
       if (this.opts.memory.applyIngest) {
+        const onDevice =
+          this.opts.onDevice ?? getDefaultOnDeviceIntelligence();
+        const summary = await onDevice.summarizeSession({
+          userMessage: textOnly,
+          assistantText: result.assistantText,
+        });
         const hybridEvent: IngestEvent = {
           eventId: `hybrid-turn-${result.turnId}`,
           schemaVersion: "1",
           source: "hybrid",
           kind: "session_summary",
-          summary: localSessionSummary({
-            userMessage: textOnly,
-            assistantText: result.assistantText,
-          }),
+          summary,
           paths: [],
           scrubbed: true,
           nativeSessionId: sessionId,
