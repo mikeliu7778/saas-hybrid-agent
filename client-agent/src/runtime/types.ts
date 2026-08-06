@@ -49,6 +49,8 @@ export interface ApplyIngestStoreResult {
   accepted: number;
   duplicates: number;
   workspacePathsAdded: number;
+  semanticAccepted?: number;
+  proceduralAccepted?: number;
 }
 
 export interface SubmitFeedbackInput {

@@ -69,8 +69,9 @@ For large-scale personal agents, three constraints rule out “one Pod per user�
 | Stage | Focus |
 |-------|--------|
 | **I0** | Universal `ingest_event` + Cursor adapter → Episode/Workspace + Sync |
-| **I1** | Claude Code / Codex adapters; Semantic / Procedural extraction |
-| **I2** | Unified Hybrid entry that recalls Memory then dispatches sidecars |
+| **I1a** | Semantic / Procedural extraction from ingest (no new adapters) |
+| **I1b** | Claude Code / Codex adapters — **deferred / not planned** |
+| **I2** / **I2a** | Unified entry: recall Memory, openai tools vs cursor sidecar (no client tools), hybrid ingest |
 | **I3** | Ingest ↔ trust flywheel; optional ingest analytics stream |
 | **I4** | Mobile recall; optional E2E Sync; read-only MCP over the personal store |
 | **I5** | Large workspace chunking; on-device summarizers; more host adapters |
@@ -110,6 +111,12 @@ One-shot: sidecar (optional) + Java control plane + Web demo:
 
 ```bash
 ./scripts/dev.sh
+```
+
+Stop all (ports / leftover processes):
+
+```bash
+./scripts/stop.sh
 ```
 
 | Service | URL |

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Start python-sidecar (optional) + control-plane (backend) + Trust Demo Web UI (frontend).
 # Usage: ./scripts/dev.sh
-# Stop:  Ctrl+C
+# Stop:  Ctrl+C  or  ./scripts/stop.sh
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"

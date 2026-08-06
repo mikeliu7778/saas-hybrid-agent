@@ -22,6 +22,10 @@ import {
 } from "../trust/TrustEventQueue.js";
 import { extractText } from "./contentParts.js";
 import type { IngestEvent } from "../ingest/types.js";
+import {
+  formatMemoryBundle,
+  recalledIdsFromBundle,
+} from "../memory/formatMemoryBundle.js";
 
 export interface DefaultRuntimeOptions {
   llm: LlmTransport;
@@ -107,12 +111,8 @@ export class DefaultClientAgentRuntime implements ClientAgentRuntime {
     let recalledIds: string[] = [];
     if (this.opts.memory) {
       const bundle = await this.opts.memory.retrieve(textOnly);
-      recalledIds = bundle.semantic.map((s) => s.id);
-      const memBits = [
-        ...bundle.semantic.map((s) => `- fact: ${s.text}`),
-        ...bundle.episode.map((e) => `- past: ${e.summary}`),
-        ...bundle.workspaceHints.map((h) => `- workspace: ${h}`),
-      ];
+      recalledIds = recalledIdsFromBundle(bundle);
+      const memBits = formatMemoryBundle(bundle);
       if (memBits.length > 0) {
         session.systemPrompt = `${baseSystem}\n\nRelevant memory:\n${memBits.join("\n")}`;
       }
@@ -131,6 +131,23 @@ export class DefaultClientAgentRuntime implements ClientAgentRuntime {
         assistantText: result.assistantText,
         imageCount: imageCount > 0 ? imageCount : undefined,
       });
+
+      // I2: feed Hybrid turns back into personal KB as ingest episodes.
+      if (this.opts.memory.applyIngest) {
+        const hybridEvent: IngestEvent = {
+          eventId: `hybrid-turn-${result.turnId}`,
+          schemaVersion: "1",
+          source: "hybrid",
+          kind: "session_summary",
+          summary: `${textOnly.slice(0, 120)} → ${result.assistantText.slice(0, 120)}`,
+          paths: [],
+          scrubbed: true,
+          nativeSessionId: sessionId,
+          tsStart: new Date().toISOString(),
+          tsEnd: new Date().toISOString(),
+        };
+        await this.opts.memory.applyIngest([hybridEvent]);
+      }
 
       const events = this.trustCollector.onTurnCompleted({
         sessionId,

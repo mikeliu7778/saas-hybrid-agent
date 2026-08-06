@@ -163,4 +163,16 @@ describe("Runtime trust feedback APIs", () => {
     expect(append).not.toHaveBeenCalled();
     expect(queue.pendingCount()).toBe(1);
   });
+
+  it("runTurn writes hybrid ingest episode (I2)", async () => {
+    const mem = new InMemoryMemoryStore({ deviceId: "d1" });
+    const runtime = makeRuntime(mem);
+    const sessionId = await runtime.createSession();
+    const result = await runtime.runTurn(sessionId, "hello hybrid");
+    expect(result.status).toBe("completed");
+    expect(mem.episode.has(`epi-ingest-hybrid-turn-${result.turnId}`)).toBe(true);
+    const epi = mem.episode.get(`epi-ingest-hybrid-turn-${result.turnId}`)!;
+    expect(epi.source).toBe("hybrid");
+    expect(epi.summary).toContain("hello hybrid");
+  });
 });

@@ -13,6 +13,15 @@ export { MockLlmTransport } from "./llm/MockLlmTransport.js";
 export type { MockLlmScriptStep } from "./llm/MockLlmTransport.js";
 export { HttpLlmTransport, parseSseJsonEvents, compareCursor } from "./llm/HttpLlmTransport.js";
 export type { SseJsonEvent } from "./llm/HttpLlmTransport.js";
+export {
+  isSidecarEngine,
+  engineAllowsClientTools,
+} from "./llm/enginePolicy.js";
+export type { LlmEngine } from "./llm/enginePolicy.js";
+export {
+  formatMemoryBundle,
+  recalledIdsFromBundle,
+} from "./memory/formatMemoryBundle.js";
 export { fetchLlmCapabilities } from "./llm/HttpLlmCapabilities.js";
 export type {
   FetchLlmCapabilitiesOptions,
@@ -65,3 +74,7 @@ export type {
   ApplyIngestResult,
   ApplyIngestEpisodeDraft,
 } from "./ingest/applyIngest.js";
+export {
+  deriveIngestEvents,
+  withDerivedIngestEvents,
+} from "./ingest/deriveFromSummary.js";

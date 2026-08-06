@@ -45,4 +45,37 @@ describe("InMemoryMemoryStore.applyIngest", () => {
     const listed = await mem.listEpisode();
     expect(listed.some((e) => e.summary.includes("Refactored"))).toBe(true);
   });
+
+  it("writes semantic and procedural from decision/procedure and derived summary", async () => {
+    const mem = new InMemoryMemoryStore({ deviceId: "d1" });
+    const result = await mem.applyIngest([
+      {
+        eventId: "s-rich",
+        schemaVersion: "1",
+        source: "cursor",
+        kind: "session_summary",
+        summary: "We decided to prefer pnpm for this monorepo.",
+        paths: [],
+        scrubbed: true,
+        skillHint: "1. install\n2. build\n3. test",
+      },
+      {
+        eventId: "d-explicit",
+        schemaVersion: "1",
+        source: "hybrid",
+        kind: "decision",
+        summary: "Always use TypeScript strict mode",
+        paths: [],
+        scrubbed: true,
+      },
+    ]);
+    expect(result.semanticAccepted).toBeGreaterThanOrEqual(1);
+    expect(result.proceduralAccepted).toBeGreaterThanOrEqual(1);
+    expect([...mem.semantic.values()].some((r) => r.text.includes("strict"))).toBe(
+      true,
+    );
+    expect(mem.procedural.size).toBeGreaterThanOrEqual(1);
+    const bundle = await mem.retrieve("pnpm monorepo");
+    expect(bundle.semantic.length + bundle.procedural.length).toBeGreaterThan(0);
+  });
 });

@@ -6,6 +6,7 @@ import type {
   MemoryOrchestrator,
 } from "../runtime/types.js";
 import { applyIngestEvents } from "../ingest/applyIngest.js";
+import { withDerivedIngestEvents } from "../ingest/deriveFromSummary.js";
 import type { IngestEvent } from "../ingest/types.js";
 import { applyTrustToSemantic } from "../trust/applyTrust.js";
 import type { TrustEvent } from "../trust/types.js";
@@ -43,6 +44,19 @@ export interface EpisodeRow {
   nativeSessionId?: string;
 }
 
+export interface ProceduralRow {
+  id: string;
+  skillId: string;
+  text: string;
+  steps: string[];
+  embedding: number[];
+  updatedAt: string;
+  deviceId: string;
+  version: number;
+  tombstone?: boolean;
+  source?: string;
+}
+
 export type EmbedFn = (text: string) => Promise<{ embedding: number[]; modelId: string }>;
 
 export function cosine(a: number[], b: number[]): number {
@@ -72,6 +86,7 @@ export function hashEmbed(text: string, dims = 32): number[] {
 export class InMemoryMemoryStore implements MemoryOrchestrator {
   readonly semantic = new Map<string, SemanticRow>();
   readonly episode = new Map<string, EpisodeRow>();
+  readonly procedural = new Map<string, ProceduralRow>();
   workspacePaths: string[] = [];
   private readonly embed: EmbedFn;
   private readonly deviceId: string;
@@ -119,12 +134,22 @@ export class InMemoryMemoryStore implements MemoryOrchestrator {
       .sort((a, b) => b.score - a.score)
       .slice(0, 4);
 
+    const proc = [...this.procedural.values()]
+      .filter((r) => !r.tombstone)
+      .map((r) => ({
+        id: r.id,
+        text: r.text,
+        score: cosine(embedding, r.embedding),
+      }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, Date.now() - started > this.retrieveBudgetMs ? 1 : 4);
+
     const q = query.toLowerCase();
     const workspaceHints = this.workspacePaths
       .filter((p) => p.toLowerCase().includes(q) || q.split(/\s+/).some((w) => w.length > 2 && p.toLowerCase().includes(w)))
       .slice(0, 5);
 
-    return { semantic: sem, episode: epi, procedural: [], workspaceHints };
+    return { semantic: sem, episode: epi, procedural: proc, workspaceHints };
   }
 
   async commitTurn(turnTrace: {
@@ -183,6 +208,10 @@ export class InMemoryMemoryStore implements MemoryOrchestrator {
     this.episode.set(row.id, row);
   }
 
+  upsertProcedural(row: ProceduralRow): void {
+    this.procedural.set(row.id, row);
+  }
+
   /** List non-tombstone semantic rows (includes deprecated for UI). */
   async listSemantic(): Promise<MemoryListItem[]> {
     return [...this.semantic.values()]
@@ -215,8 +244,11 @@ export class InMemoryMemoryStore implements MemoryOrchestrator {
   }
 
   async applyIngest(events: IngestEvent[]): Promise<ApplyIngestStoreResult> {
-    const draft = applyIngestEvents(events, {
+    const expanded = withDerivedIngestEvents(events);
+    const draft = applyIngestEvents(expanded, {
       existingEpisodeIds: new Set(this.episode.keys()),
+      existingSemanticIds: new Set(this.semantic.keys()),
+      existingProceduralIds: new Set(this.procedural.keys()),
       existingWorkspacePaths: this.workspacePaths,
     });
 
@@ -239,6 +271,40 @@ export class InMemoryMemoryStore implements MemoryOrchestrator {
       });
     }
 
+    for (const sem of draft.semantic) {
+      if (this.semantic.size >= this.maxRows) break;
+      const { embedding } = await this.embed(sem.text);
+      const now = new Date().toISOString();
+      this.semantic.set(sem.id, {
+        id: sem.id,
+        text: sem.text,
+        embedding,
+        tags: sem.tags,
+        updatedAt: now,
+        deviceId: this.deviceId,
+        version: 1,
+        trustScore: 0.55,
+        confidence: 0.55,
+      });
+    }
+
+    for (const proc of draft.procedural) {
+      if (this.procedural.size >= this.maxRows) break;
+      const { embedding } = await this.embed(proc.text);
+      const now = new Date().toISOString();
+      this.procedural.set(proc.id, {
+        id: proc.id,
+        skillId: proc.skillId,
+        text: proc.text,
+        steps: proc.steps,
+        embedding,
+        updatedAt: now,
+        deviceId: this.deviceId,
+        version: 1,
+        source: proc.source,
+      });
+    }
+
     for (const p of draft.workspacePathsAdded) {
       if (!this.workspacePaths.includes(p)) this.workspacePaths.push(p);
     }
@@ -247,6 +313,8 @@ export class InMemoryMemoryStore implements MemoryOrchestrator {
       accepted: draft.episodes.length,
       duplicates: draft.skippedDuplicateIds.length,
       workspacePathsAdded: draft.workspacePathsAdded.length,
+      semanticAccepted: draft.semantic.length,
+      proceduralAccepted: draft.procedural.length,
     };
   }
 

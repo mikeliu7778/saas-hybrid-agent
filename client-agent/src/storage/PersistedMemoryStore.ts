@@ -1,6 +1,7 @@
 import {
   InMemoryMemoryStore,
   type EpisodeRow,
+  type ProceduralRow,
   type SemanticRow,
   type EmbedFn,
 } from "../memory/InMemoryMemoryStore.js";
@@ -8,7 +9,7 @@ import type { TrustEvent } from "../trust/types.js";
 import type { KvStore } from "./types.js";
 
 /**
- * Memory store that snapshots semantic/episode rows to KvStore (OPFS or memory).
+ * Memory store that snapshots semantic/episode/procedural rows to KvStore (OPFS or memory).
  */
 export class PersistedMemoryStore extends InMemoryMemoryStore {
   constructor(
@@ -27,13 +28,16 @@ export class PersistedMemoryStore extends InMemoryMemoryStore {
     const snap = await this.kv.getJson<{
       semantic: SemanticRow[];
       episode: EpisodeRow[];
+      procedural?: ProceduralRow[];
       workspacePaths: string[];
     }>("memory/snapshot.json");
     if (!snap) return;
     this.semantic.clear();
     this.episode.clear();
+    this.procedural.clear();
     for (const row of snap.semantic ?? []) this.semantic.set(row.id, row);
     for (const row of snap.episode ?? []) this.episode.set(row.id, row);
+    for (const row of snap.procedural ?? []) this.procedural.set(row.id, row);
     this.workspacePaths = snap.workspacePaths ?? [];
   }
 
@@ -41,6 +45,7 @@ export class PersistedMemoryStore extends InMemoryMemoryStore {
     await this.kv.setJson("memory/snapshot.json", {
       semantic: [...this.semantic.values()],
       episode: [...this.episode.values()],
+      procedural: [...this.procedural.values()],
       workspacePaths: this.workspacePaths,
     });
   }
@@ -63,6 +68,11 @@ export class PersistedMemoryStore extends InMemoryMemoryStore {
 
   override upsertEpisode(row: EpisodeRow): void {
     super.upsertEpisode(row);
+    void this.flush();
+  }
+
+  override upsertProcedural(row: ProceduralRow): void {
+    super.upsertProcedural(row);
     void this.flush();
   }
 

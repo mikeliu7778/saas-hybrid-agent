@@ -215,10 +215,12 @@ const SAMPLE_INGEST_EVENTS = [
     schemaVersion: "1",
     source: "cursor",
     kind: "session_summary",
-    summary: "Please fix auth flake in src/auth/AuthService.ts → Done. Updated AuthService and README.",
+    summary:
+      "Please fix auth flake. We decided to prefer JWT for session cookies. Updated AuthService and README.",
     paths: ["src/auth/AuthService.ts", "README.md"],
     scrubbed: true,
     nativeSessionId: "demo-sess-1",
+    skillHint: "1. reproduce flake\n2. patch AuthService\n3. run npm test",
     tsStart: "2026-08-06T01:00:00.000Z",
     tsEnd: "2026-08-06T01:20:00.000Z",
   },
@@ -241,7 +243,7 @@ async function ingestSample() {
   try {
     const result = await runtime.applyIngest(SAMPLE_INGEST_EVENTS);
     setStatus(
-      `Ingest: accepted=${result.accepted} duplicates=${result.duplicates} workspace+=${result.workspacePathsAdded}`,
+      `Ingest: epi=${result.accepted} sem=${result.semanticAccepted ?? 0} proc=${result.proceduralAccepted ?? 0} dup=${result.duplicates} ws+=${result.workspacePathsAdded}`,
     );
     await refreshMemory();
   } catch (e) {

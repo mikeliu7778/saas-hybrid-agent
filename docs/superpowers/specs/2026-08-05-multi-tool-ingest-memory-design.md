@@ -223,7 +223,8 @@ I0 协议与 Cursor 闭环（本期）
 | 阶段 | 主题 | 依赖 | 优先级 |
 |------|------|------|--------|
 | **I0** | 通用 schema + Cursor adapter + `applyIngest` → Episode/Workspace + Sync | 现有 client-agent Memory、Sync | P0（本期） |
-| **I1** | Claude Code / Codex adapters；Semantic / Procedural 异步抽取 | I0；PRD Procedural（约 Phase B） | P0 |
+| **I1** | **I1a**：Semantic / Procedural 抽取落库（无 Claude/Codex adapter） | I0 | P0 |
+| **I1b**（可选后置） | Claude / Codex adapters（当前 **不做**） | — | — |
 | **I2** | Hybrid 统一入口：召回 Memory 后 dispatch cursor/claude/codex sidecar | I0；现有 Cursor complete sidecar | P0（接 I1 或并行后半） |
 | **I3** | Ingest ↔ Trust 采信；可选控制面 `ingest_events` 分析流 | I0 + trust API | P1 |
 | **I4** | iOS/Android 同协议召回；可选 E2E Sync；MCP 只读暴露个人库 | PRD Phase B；I1 | P1 |
@@ -237,21 +238,30 @@ I0 协议与 Cursor 闭环（本期）
 - Sync 多端可见；Demo 可演示「Cursor 干活 → Hybrid 记得」  
 - **不做**：Claude/Codex adapter、统一派活、中心 ANN  
 
-### 11.3 I1 — 多工具喂料 + 分型写全
+### 11.3 I1 — 分型写全（**修订：不做新 adapter**）
 
-- Claude Code adapter（Agent SDK / `~/.claude` 会话）  
-- Codex adapter（`~/.codex/sessions` 或 SDK events）  
-- `decision` → Semantic、`procedure_draft` → Procedural 的异步抽取管线（可规则 + 可选 LLM）  
-- adapter 注册表：按本机探测到的工具根目录自动启用  
-- **成功标准**：同一账号下，三工具任一会话摘要可在另一端 Hybrid 召回  
+**本期做（I1a）：**
+
+- `decision` → Semantic、`procedure_draft` → Procedural 落库（`applyIngest`）  
+- 对 `session_summary` 做**规则抽取**（决定句 / 步骤草稿），派生 decision / procedure_draft 再写入  
+- Procedural 进入本地检索与持久化；与 Episode/Workspace 一并 Sync 友好  
+
+**明确不做（后置 / 取消）：**
+
+- Claude Code / Codex adapters（用户确认不需要；Cursor + 通用 `events` 足够喂料）  
+- adapter 本机目录自动注册表  
+
+**成功标准：** ingest 事件（含派生）能在 Hybrid 召回 Semantic + Procedural；重复 `event_id` 幂等。
 
 ### 11.4 I2 — 统一入口（双轨第二段）
 
-- Hybrid UI：选 engine（`openai` 工具环 \| `cursor` \| `claude_code` \| `codex`）  
-- 派活前 **先召回** 个人 Memory bundle 注入上下文  
-- 产品规则写死：**sidecar 引擎忽略端上 `tools`**（对齐现 Cursor 一期），避免双工具环；`openai` 路径保留 Hybrid ToolHost  
-- 派活产生的回合也可写成 `source=hybrid` 的 ingest/Episode，反哺知识库  
-- **成功标准**：在 Claude/Codex/Cursor 间切换入口，Memory 连续，无需重讲项目约定  
+**状态：实现中（I2a，仅 openai + cursor）**
+
+- Hybrid UI：选 engine（`openai` 工具环 \| `cursor` sidecar）；`claude_code` / `codex` 派活后置（无对应 sidecar）  
+- 派活前 **先召回** 个人 Memory bundle（含 Semantic / Episode / Procedural / Workspace）注入 system prompt  
+- 产品规则写死：**sidecar 引擎不发送端上 `tools`**（`HttpLlmTransport` + `enginePolicy`）；`openai` 保留 Hybrid ToolHost  
+- 派活完成的回合写成 `source=hybrid` 的 `session_summary` ingest → Episode（可再派生 decision/procedure）  
+- **成功标准（I2a）：** 切换 openai/cursor 时 Memory 连续；cursor 请求 `tools=[]`；Hybrid 回合进入 Episodes  
 
 ### 11.5 I3 — 质量飞轮
 
@@ -287,7 +297,7 @@ I0 协议与 Cursor 闭环（本期）
 
 | 产品 Phase | Ingest 轨道大致落点 |
 |------------|---------------------|
-| A（Web 闭环，当前） | **I0**；I1/I2 可在 A 尾或 B 头启动 |
+| A（Web 闭环，当前） | **I0** + **I1a**（Semantic/Procedural）；I2 可接续 |
 | B（移动 + Procedural + 可选 E2E） | **I1** Procedural 抽取、**I4** 移动召回 / E2E / MCP 只读 |
 | C（大 Workspace、小模型） | **I5** |
 

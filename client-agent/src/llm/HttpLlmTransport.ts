@@ -6,6 +6,7 @@ import type {
   LlmToolDefinition,
   LlmTransport,
 } from "../runtime/types.js";
+import { engineAllowsClientTools } from "./enginePolicy.js";
 
 export interface HttpLlmTransportOptions {
   baseUrl: string;
@@ -148,10 +149,11 @@ export class HttpLlmTransport implements LlmTransport {
     stream: boolean,
     cursor?: string,
   ): Record<string, unknown> {
+    const effectiveTools = engineAllowsClientTools(this.provider) ? tools : [];
     const body: Record<string, unknown> = {
       model: this.model,
       messages: toWireMessages(messages),
-      tools,
+      tools: effectiveTools,
       stream,
       cursor,
     };

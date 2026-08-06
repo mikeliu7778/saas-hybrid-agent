@@ -36,14 +36,14 @@
   </head>
   <body>
     <h1>Hybrid Agent</h1>
-    <p>可交互演示：对话 + 显式采信 + Memory 删除（非写死脚本）。</p>
+    <p>可交互演示：统一入口选 Engine → 先召回 Memory → 对话；Ingest / 采信 / Memory。</p>
     <div class="row">
       <input id="baseUrl" value="http://localhost:8080" size="40" />
       <label>
-        LLM
-        <select id="provider">
-          <option value="openai">openai</option>
-          <option value="cursor">cursor</option>
+        Engine
+        <select id="provider" title="openai keeps Hybrid tools; cursor is sidecar text-only">
+          <option value="openai">openai (tools)</option>
+          <option value="cursor">cursor (sidecar, no client tools)</option>
         </select>
       </label>
       <button id="register">注册设备</button>
