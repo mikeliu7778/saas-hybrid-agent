@@ -8,7 +8,11 @@ import type {
 import { applyIngestEvents } from "../ingest/applyIngest.js";
 import { withDerivedIngestEvents } from "../ingest/deriveFromSummary.js";
 import type { IngestEvent } from "../ingest/types.js";
-import { applyTrustToSemantic } from "../trust/applyTrust.js";
+import {
+  applyTrustToEpisode,
+  applyTrustToProcedural,
+  applyTrustToSemantic,
+} from "../trust/applyTrust.js";
 import type { TrustEvent } from "../trust/types.js";
 
 export interface SemanticRow {
@@ -42,6 +46,11 @@ export interface EpisodeRow {
   /** Ingest source tool, e.g. cursor */
   source?: string;
   nativeSessionId?: string;
+  trustScore?: number;
+  confidence?: number;
+  lastTrustedAt?: string;
+  deprecated?: boolean;
+  supersededBy?: string;
 }
 
 export interface ProceduralRow {
@@ -55,6 +64,11 @@ export interface ProceduralRow {
   version: number;
   tombstone?: boolean;
   source?: string;
+  trustScore?: number;
+  confidence?: number;
+  lastTrustedAt?: string;
+  deprecated?: boolean;
+  supersededBy?: string;
 }
 
 export type EmbedFn = (text: string) => Promise<{ embedding: number[]; modelId: string }>;
@@ -121,25 +135,29 @@ export class InMemoryMemoryStore implements MemoryOrchestrator {
 
     const now = Date.now();
     const epi = [...this.episode.values()]
-      .filter((r) => !r.tombstone)
+      .filter((r) => !r.tombstone && !r.deprecated)
       .map((r) => {
         const ageDays = Math.max(0, (now - Date.parse(r.updatedAt)) / 86_400_000);
         const decay = Math.exp(-ageDays / 30);
         return {
           id: r.id,
           summary: r.summary,
-          score: cosine(embedding, r.embedding) * decay,
+          score:
+            cosine(embedding, r.embedding) *
+            decay *
+            (0.5 + 0.5 * (r.trustScore ?? 0.5)),
         };
       })
       .sort((a, b) => b.score - a.score)
       .slice(0, 4);
 
     const proc = [...this.procedural.values()]
-      .filter((r) => !r.tombstone)
+      .filter((r) => !r.tombstone && !r.deprecated)
       .map((r) => ({
         id: r.id,
         text: r.text,
-        score: cosine(embedding, r.embedding),
+        score:
+          cosine(embedding, r.embedding) * (0.5 + 0.5 * (r.trustScore ?? 0.5)),
       }))
       .sort((a, b) => b.score - a.score)
       .slice(0, Date.now() - started > this.retrieveBudgetMs ? 1 : 4);
@@ -238,9 +256,32 @@ export class InMemoryMemoryStore implements MemoryOrchestrator {
 
   async applyTrust(event: TrustEvent): Promise<void> {
     if (event.target !== "memory_item") return;
-    const row = this.semantic.get(event.targetId);
-    if (!row) return;
-    this.semantic.set(event.targetId, applyTrustToSemantic(row, event));
+    const sem = this.semantic.get(event.targetId);
+    if (sem) {
+      this.semantic.set(event.targetId, applyTrustToSemantic(sem, event));
+      return;
+    }
+    const epi = this.episode.get(event.targetId);
+    if (epi) {
+      this.episode.set(event.targetId, applyTrustToEpisode(epi, event));
+      return;
+    }
+    const proc = this.procedural.get(event.targetId);
+    if (proc) {
+      this.procedural.set(event.targetId, applyTrustToProcedural(proc, event));
+    }
+  }
+
+  /** Soft-delete episode (I3 distrust path). */
+  async deleteEpisode(id: string): Promise<void> {
+    const row = this.episode.get(id);
+    if (!row || row.tombstone) return;
+    this.episode.set(id, {
+      ...row,
+      deprecated: true,
+      version: row.version + 1,
+      updatedAt: new Date().toISOString(),
+    });
   }
 
   async applyIngest(events: IngestEvent[]): Promise<ApplyIngestStoreResult> {
@@ -326,6 +367,8 @@ export class InMemoryMemoryStore implements MemoryOrchestrator {
         summary: r.summary,
         source: r.source,
         updatedAt: r.updatedAt,
+        trustScore: r.trustScore,
+        deprecated: r.deprecated,
       }));
   }
 

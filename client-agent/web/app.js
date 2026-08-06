@@ -177,7 +177,35 @@ async function refreshMemory() {
     for (const e of episodes) {
       const li = document.createElement("li");
       const src = e.source ? `[${e.source}] ` : "";
-      li.textContent = `${src}${e.summary}`;
+      const score =
+        e.trustScore != null ? ` score=${Number(e.trustScore).toFixed(2)}` : "";
+      const dep = e.deprecated ? " [deprecated]" : "";
+      li.appendChild(
+        document.createTextNode(`${src}${e.summary}${score}${dep} `),
+      );
+      if (!e.deprecated && typeof runtime.deleteEpisode === "function") {
+        const down = document.createElement("button");
+        down.type = "button";
+        down.textContent = "👎";
+        down.title = "不采信该摘要";
+        down.onclick = async () => {
+          await runtime.submitFeedback({
+            sessionId: sessionId || "local",
+            target: "memory_item",
+            targetId: e.id,
+            signal: "distrust",
+          });
+          await refreshMemory();
+        };
+        const del = document.createElement("button");
+        del.type = "button";
+        del.textContent = "删除";
+        del.onclick = async () => {
+          await runtime.deleteEpisode(e.id);
+          await refreshMemory();
+        };
+        li.append(down, del);
+      }
       epiUl.appendChild(li);
     }
   }

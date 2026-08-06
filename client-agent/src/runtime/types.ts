@@ -43,6 +43,8 @@ export interface EpisodeListItem {
   summary: string;
   source?: string;
   updatedAt?: string;
+  trustScore?: number;
+  deprecated?: boolean;
 }
 
 export interface ApplyIngestStoreResult {
@@ -92,6 +94,7 @@ export interface ClientAgentRuntime {
   applyIngest?(events: IngestEvent[]): Promise<ApplyIngestStoreResult>;
   listEpisodes?(): Promise<EpisodeListItem[]>;
   listWorkspacePaths?(): Promise<string[]>;
+  deleteEpisode?(id: string): Promise<void>;
 }
 
 export interface LlmMessage {
@@ -168,6 +171,7 @@ export interface MemoryOrchestrator {
   applyIngest?(events: IngestEvent[]): Promise<ApplyIngestStoreResult>;
   listEpisode?(): Promise<EpisodeListItem[]>;
   listWorkspacePaths?(): Promise<string[]>;
+  deleteEpisode?(id: string): Promise<void>;
 }
 
 export interface SyncMutation {

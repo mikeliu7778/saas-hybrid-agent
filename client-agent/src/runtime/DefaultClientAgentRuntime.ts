@@ -218,6 +218,14 @@ export class DefaultClientAgentRuntime implements ClientAgentRuntime {
     this.fireFlush();
   }
 
+  async deleteEpisode(id: string): Promise<void> {
+    await this.opts.memory?.deleteEpisode?.(id);
+    const event = this.trustCollector.onMemoryDeleted(id);
+    await this.opts.memory?.applyTrust?.(event);
+    this.trustQueue.enqueue(event);
+    this.fireFlush();
+  }
+
   setTrustReportingEnabled(enabled: boolean): void {
     this.trustQueue.setReportingEnabled(enabled);
   }

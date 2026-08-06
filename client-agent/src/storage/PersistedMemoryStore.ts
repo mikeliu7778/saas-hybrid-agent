@@ -93,4 +93,9 @@ export class PersistedMemoryStore extends InMemoryMemoryStore {
     await super.deleteSemantic(id);
     await this.flush();
   }
+
+  override async deleteEpisode(id: string): Promise<void> {
+    await super.deleteEpisode(id);
+    await this.flush();
+  }
 }

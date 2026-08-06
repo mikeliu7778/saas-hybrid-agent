@@ -72,7 +72,8 @@ For large-scale personal agents, three constraints rule out “one Pod per user�
 | **I1a** | Semantic / Procedural extraction from ingest (no new adapters) |
 | **I1b** | Claude Code / Codex adapters — **deferred / not planned** |
 | **I2** / **I2a** | Unified entry: recall Memory, openai tools vs cursor sidecar (no client tools), hybrid ingest |
-| **I3** | Ingest ↔ trust flywheel; optional ingest analytics stream |
+| **I3** / **I3a** | Ingest ↔ trust on Episode/Procedural; delete/👎 lowers recall |
+| **I3b** | Optional control-plane ingest event analytics — deferred |
 | **I4** | Mobile recall; optional E2E Sync; read-only MCP over the personal store |
 | **I5** | Large workspace chunking; on-device summarizers; more host adapters |
 

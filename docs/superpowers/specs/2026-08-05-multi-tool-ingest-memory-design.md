@@ -265,10 +265,13 @@ I0 协议与 Cursor 闭环（本期）
 
 ### 11.5 I3 — 质量飞轮
 
-- 用户删 Episode / 👎 摘要 → trust `distrust`，降低召回  
-- 续用某条 ingest 来源的事实 → `trust` 强化  
-- 可选：控制面 `POST /v1/ingest/events` append-only（分析用，**非** Memory 真相）；默认关闭或抽样  
-- 平台 metrics：按 `source` / `kind` 的 ingest 采纳率（与 trust metrics 并列）  
+**状态：I3a 已实现（端上）；控制面 ingest 分析流后置为 I3b**
+
+- 用户删 Episode / 👎 摘要 → trust `distrust`，`deprecated` 后不再召回  
+- 续用 recalled Semantic / Episode / Procedural → `trust` 强化（`applyTrust` 覆盖三类 Memory）  
+- Episode / Procedural 召回按 `trustScore` 加权，过滤 `deprecated`  
+- Demo：Episodes 支持 👎 与删除  
+- **I3b（后置）**：可选控制面 `POST /v1/ingest/events` append-only；按 `source`/`kind` 的 ingest metrics  
 
 ### 11.6 I4 — 多端产品化与外露
 
