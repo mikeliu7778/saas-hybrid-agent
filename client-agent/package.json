@@ -11,7 +11,8 @@
     "test:watch": "vitest",
     "lint": "tsc -p tsconfig.json --noEmit",
     "demo": "npm run build && node dist/demo.js",
-    "demo:web": "npm run build && npx --yes serve -p 5173 ."
+    "demo:web": "npm run build && npx --yes serve -p 5173 .",
+    "mcp": "npm run build && node dist/mcp/server.js"
   },
   "keywords": [],
   "author": "",

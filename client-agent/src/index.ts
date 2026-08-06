@@ -22,6 +22,31 @@ export {
   formatMemoryBundle,
   recalledIdsFromBundle,
 } from "./memory/formatMemoryBundle.js";
+export {
+  encodeMemoryPack,
+  decodeMemoryPack,
+  memorySearch,
+  memoryGet,
+} from "./memory/memoryPack.js";
+export type {
+  MemoryPackV1,
+  MemoryHit,
+  MemoryRecord,
+} from "./memory/memoryPack.js";
+export {
+  localSessionSummary,
+  rerankMemoryHits,
+} from "./memory/localSummarizer.js";
+export {
+  chunkText,
+  contentHash,
+  WorkspaceChunkStore,
+} from "./workspace/chunks.js";
+export type {
+  TextChunk,
+  ChunkedFileMeta,
+  ChunkTextOptions,
+} from "./workspace/chunks.js";
 export { fetchLlmCapabilities } from "./llm/HttpLlmCapabilities.js";
 export type {
   FetchLlmCapabilitiesOptions,

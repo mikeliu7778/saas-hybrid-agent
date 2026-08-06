@@ -74,8 +74,10 @@ For large-scale personal agents, three constraints rule out “one Pod per user�
 | **I2** / **I2a** | Unified entry: recall Memory, openai tools vs cursor sidecar (no client tools), hybrid ingest |
 | **I3** / **I3a** | Ingest ↔ trust on Episode/Procedural; delete/👎 lowers recall |
 | **I3b** | Optional control-plane ingest event analytics — deferred |
-| **I4** | Mobile recall; optional E2E Sync; read-only MCP over the personal store |
-| **I5** | Large workspace chunking; on-device summarizers; more host adapters |
+| **I4** / **I4a** | MemoryPack import/export + read-only MCP (`memory_search` / `memory_get`) |
+| **I4b** | Mobile runtime recall + optional E2E Sync — deferred |
+| **I5** / **I5a** | Workspace content-hash chunking; on-device summary + lexical rerank |
+| **I5b** | Chunk sync, more host adapters, Dev Companion, real tiny models — deferred |
 
 **Explicitly deferred / never:** multi-tenant billing console / admin UI; same-session hybrid tool execution (some tools on cloud workers); central cross-user vector search / public RAG; Cursor Cloud Agent / `/v1/agents/**`; mapping Cursor internal tools to control-plane `tool_calls`; cloud auto-rewrite of user Memory.
 
@@ -84,9 +86,17 @@ For large-scale personal agents, three constraints rule out “one Pod per user�
 | Path | Role |
 |------|------|
 | `server/` | Spring Boot control plane |
-| `client-agent/` | TypeScript on-device runtime + Trust Demo Web UI |
+| `client-agent/` | TypeScript on-device runtime + Trust Demo Web UI + read-only Memory MCP |
 | `python-sidecar/` | Optional Cursor Local Agent sidecar |
 | `docs/superpowers/specs/` | PRD and design docs |
+
+Read-only MCP (I4a) — load a MemoryPack then expose `memory_search` / `memory_get`:
+
+```bash
+cd client-agent
+# after exporting a pack.json via exportMemoryPack
+HYBRID_MEMORY_PACK=/path/to/pack.json npm run mcp
+```
 
 ## Build
 

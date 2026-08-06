@@ -26,6 +26,12 @@ import {
   formatMemoryBundle,
   recalledIdsFromBundle,
 } from "../memory/formatMemoryBundle.js";
+import {
+  decodeMemoryPack,
+  encodeMemoryPack,
+} from "../memory/memoryPack.js";
+import { localSessionSummary } from "../memory/localSummarizer.js";
+import { InMemoryMemoryStore } from "../memory/InMemoryMemoryStore.js";
 
 export interface DefaultRuntimeOptions {
   llm: LlmTransport;
@@ -139,7 +145,10 @@ export class DefaultClientAgentRuntime implements ClientAgentRuntime {
           schemaVersion: "1",
           source: "hybrid",
           kind: "session_summary",
-          summary: `${textOnly.slice(0, 120)} → ${result.assistantText.slice(0, 120)}`,
+          summary: localSessionSummary({
+            userMessage: textOnly,
+            assistantText: result.assistantText,
+          }),
           paths: [],
           scrubbed: true,
           nativeSessionId: sessionId,
@@ -170,12 +179,18 @@ export class DefaultClientAgentRuntime implements ClientAgentRuntime {
     this.requireSession(sessionId).interrupt.abort();
   }
 
-  async importMemoryPack(_data: Uint8Array): Promise<void> {
-    throw new Error("importMemoryPack: Phase B");
+  async importMemoryPack(data: Uint8Array): Promise<void> {
+    if (!(this.opts.memory instanceof InMemoryMemoryStore)) {
+      throw new Error("importMemoryPack: memory store must be InMemoryMemoryStore");
+    }
+    decodeMemoryPack(this.opts.memory, data);
   }
 
   async exportMemoryPack(): Promise<Uint8Array> {
-    throw new Error("exportMemoryPack: Phase B");
+    if (!(this.opts.memory instanceof InMemoryMemoryStore)) {
+      throw new Error("exportMemoryPack: memory store must be InMemoryMemoryStore");
+    }
+    return encodeMemoryPack(this.opts.memory);
   }
 
   async pushSync(): Promise<void> {

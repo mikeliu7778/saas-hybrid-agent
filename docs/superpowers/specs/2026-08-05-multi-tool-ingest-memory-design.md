@@ -228,7 +228,8 @@ I0 协议与 Cursor 闭环（本期）
 | **I2** | Hybrid 统一入口：召回 Memory 后 dispatch cursor/claude/codex sidecar | I0；现有 Cursor complete sidecar | P0（接 I1 或并行后半） |
 | **I3** | Ingest ↔ Trust 采信；可选控制面 `ingest_events` 分析流 | I0 + trust API | P1 |
 | **I4** | iOS/Android 同协议召回；可选 E2E Sync；MCP 只读暴露个人库 | PRD Phase B；I1 | P1 |
-| **I5** | Workspace 大文件分块；端侧小模型摘要/重排；更多 host adapter | PRD Phase C | P2 |
+| **I5a** | Workspace 内容哈希分块；端侧摘要/词法重排（无云） | PRD Phase C 前半 | P2 |
+| **I5b** | 分块 Sync、更多 host、Dev Companion、真小模型 | PRD Phase C 后半 | P2 |
 
 ### 11.2 I0 — 协议与 Cursor 闭环（本期）
 
@@ -275,17 +276,30 @@ I0 协议与 Cursor 闭环（本期）
 
 ### 11.6 I4 — 多端产品化与外露
 
-- 移动 Runtime 召回同一 Sync Memory（PRD Phase B）  
-- 可选 E2E Sync（隐私敏感用户）  
-- MCP **只读** tools：`memory_search` / `memory_get`（给仍留在 Cursor/Claude 里的用户召回 Hybrid 库）  
-- 主叙事仍是个人助理，不是「又一个 MCP memory 插件」  
+**状态：I4a 已实现（MemoryPack + 只读 MCP）；移动 / E2E 为 I4b**
+
+- **I4a**
+  - `exportMemoryPack` / `importMemoryPack`（JSON schema v1：semantic / episode / procedural / workspace）
+  - 只读 API：`memorySearch` / `memoryGet`
+  - MCP stdio server：`memory_search` / `memory_get`（`HYBRID_MEMORY_PACK` 加载 pack；`npm run mcp`）
+  - 主叙事仍是个人助理；MCP 仅为外挂召回，非主产品  
+- **I4b（后置）**
+  - iOS / Android 同协议 Runtime 召回 Sync Memory  
+  - 可选 E2E Sync  
 
 ### 11.7 I5 — 增强
 
-- Workspace 大文件分块同步与按需拉取（PRD Phase C）  
-- 端侧小模型做 session 摘要 / 重排，减少云摘要成本  
-- 更多 host：Aider、Continue、OpenCode 等（仅当 adapter 成本低）  
-- Dev Companion / 远程终端类能力若落地，其会话同样走 ingest  
+**状态：I5a 已实现（分块 + 端侧摘要/重排）；更多 host / Dev Companion 为 I5b**
+
+- **I5a**
+  - Workspace 大文件：**内容哈希分块**（`WorkspaceChunkStore` / `chunkText`），支持按 hash 按需取块与 GC  
+  - 端侧 **无云** 摘要：`localSessionSummary`（Hybrid ingest 使用）  
+  - 端侧 **重排**：`rerankMemoryHits`（`memorySearch` / MCP 召回）  
+- **I5b（后置）**
+  - 分块经 Sync 多端按需拉取（控制面只存 hash 清单）  
+  - 更多 host adapter（Aider / Continue / OpenCode）  
+  - Dev Companion / 远程终端会话走 ingest  
+  - 真小模型（onnx/wasm）替换规则摘要  
 
 ### 11.8 明确不进 Roadmap（保持 No-Go）
 
